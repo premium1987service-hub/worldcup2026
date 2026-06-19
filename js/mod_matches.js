@@ -43,7 +43,7 @@ const matches = {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
-    });
+    }) + ' VNT';
   },
 
   // Định dạng ngày giờ ngắn để làm giao diện gọn gàng hơn
@@ -59,7 +59,7 @@ const matches = {
       day: '2-digit',
       month: '2-digit'
     });
-    return `${time} ngày ${date}`;
+    return `${time} ngày ${date} VNT`;
   },
 
   // Lọc danh sách trận đấu cho Trang chủ (Trong vòng 24 giờ xung quanh thời điểm hiện tại: now ± 24h)
