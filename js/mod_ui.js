@@ -329,7 +329,24 @@ const ui = {
       'ba lan': 'pl',
       'poland': 'pl',
       'mexico': 'mx',
-      'saudi': 'sa'
+      'saudi': 'sa',
+      'sweden': 'se',
+      'curacao': 'cw',
+      'curaçao': 'cw',
+      'paraguay': 'py',
+      'cape verde': 'cv',
+      'egypt': 'eg',
+      'czechia': 'cz',
+      'czech republic': 'cz',
+      'south africa': 'za',
+      'bosnia and herzegovina': 'ba',
+      'bosnia': 'ba',
+      'scotland': 'gb-sct',
+      'haiti': 'ht',
+      'türkiye': 'tr',
+      'turkey': 'tr',
+      'ivory coast': 'ci',
+      'new zealand': 'nz'
     };
 
     const code = flagMap[name] || '';
