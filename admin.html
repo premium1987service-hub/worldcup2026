@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - World Cup Challenge</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Wrapper cho Header (sẽ được mod_ui render) -->
+  <div id="header-wrapper"></div>
+
+  <!-- Trường hợp từ chối truy cập -->
+  <div id="access-denied-zone" class="container" style="display:none; text-align:center; padding: 100px 20px;">
+    <svg viewBox="0 0 24 24" width="80" height="80" fill="none" stroke="#ef4444" stroke-width="2" style="margin-bottom:24px;">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+    <h1 style="color:#ef4444;">Từ chối truy cập</h1>
+    <p style="color:var(--text-medium); margin-bottom: 24px;">Bạn không có quyền quản trị viên (Admin) để xem trang này.</p>
+    <a href="index.html" class="login-btn-google" style="display:inline-block; text-decoration:none; background:var(--secondary); color:#fff;">Quay lại Trang chủ</a>
+  </div>
+
+  <!-- Giao diện Admin chính -->
+  <main class="container" id="admin-main-zone" style="display:none;">
+    <h1 class="section-title">Hệ thống Quản trị & Giám sát</h1>
+    <p style="color: var(--text-muted); margin-bottom: 30px;">Hạ tầng quản lý người dùng, kết quả trận đấu, tính điểm và giả lập.</p>
+
+    <div class="admin-grid">
+      <!-- Cột trái: Bảng điều khiển & Giả lập -->
+      <div class="admin-sidebar">
+        <!-- Quản lý hệ thống -->
+        <div class="admin-card">
+          <h3 style="color:var(--primary); margin-bottom:16px;">Vận hành hệ thống</h3>
+          
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <button id="btn-recalculate-all" class="admin-action-btn">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+              </svg>
+              Tính toán lại điểm (Tất cả)
+            </button>
+            
+            <button id="btn-sync-api" class="admin-action-btn secondary-action">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+              </svg>
+              Đồng bộ Lịch thi đấu API
+            </button>
+          </div>
+        </div>
+
+        <!-- Giám sát Auto-Sync -->
+        <div class="admin-card">
+          <h3 style="color:var(--primary); margin-bottom:8px;">Trạng thái Auto-Sync</h3>
+          <div style="font-size:0.85rem; color:var(--text-medium); margin-bottom:12px; display:flex; flex-direction:column; gap:6px;">
+            <div>Chế độ: <span id="sync-mode-text" class="player-badge">Demo</span></div>
+            <div>Trận đang poll: <span id="sync-active-count" style="font-weight:700;">0</span></div>
+            <div>Đồng bộ gần nhất: <span id="sync-last-time" style="color:var(--text-muted);">Chưa chạy</span></div>
+          </div>
+
+          <h4 style="font-size:0.85rem; margin-bottom:6px;">Console giả lập/quét</h4>
+          <div class="simulation-console" id="console-logs">
+            <div class="simulation-log-item">[Hệ thống] Đang tải bảng điều khiển admin...</div>
+          </div>
+        </div>
+
+        <!-- Trình giả lập trận đấu (Chỉ hiện khi USE_MOCK_DATA = true) -->
+        <div class="admin-card" id="mock-simulator-card">
+          <h3 style="color:var(--accent); margin-bottom:8px;">Trình giả lập Trận đấu (Mock)</h3>
+          <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:12px;">Dành riêng cho chế độ Demo để test realtime tính điểm và bảng xếp hạng.</p>
+          
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <button onclick="simulateMatchEvent('start_live')" class="admin-action-btn secondary-action" style="font-size:0.8rem; border-color:var(--primary); color:var(--primary);">
+              Cho các trận Sắp đá bắt đầu đá (Live)
+            </button>
+            <button onclick="simulateMatchEvent('finish_random')" class="admin-action-btn secondary-action" style="font-size:0.8rem; border-color:var(--accent); color:var(--accent);">
+              Kết thúc ngẫu nhiên 1 trận đang LIVE
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cột phải: Quản lý Trận đấu & Override -->
+      <div class="admin-content">
+        <!-- Danh sách Trận đấu & Kết quả -->
+        <div class="admin-card">
+          <h3 style="color:var(--primary); margin-bottom:16px;">Danh sách Trận đấu & Cập nhật Kết quả</h3>
+          
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Trận đấu</th>
+                  <th style="width:120px;">Vòng/Giải</th>
+                  <th style="width:120px;">Trạng thái</th>
+                  <th style="width:150px; text-align:center;">Kết quả</th>
+                  <th style="width:120px; text-align:center;">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="admin-match-rows">
+                <tr>
+                  <td colspan="5" style="text-align:center; padding:20px;">Đang tải danh sách trận đấu...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Danh sách Người dùng -->
+        <div class="admin-card">
+          <h3 style="color:var(--primary); margin-bottom:16px;">Danh sách Người dùng</h3>
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Người chơi</th>
+                  <th>Email</th>
+                  <th>Joined At</th>
+                  <th style="text-align:center; width:120px;">Phân quyền</th>
+                </tr>
+              </thead>
+              <tbody id="admin-user-rows">
+                <tr>
+                  <td colspan="4" style="text-align:center; padding:20px;">Đang tải danh sách người chơi...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Chi tiết Dự đoán theo trận -->
+        <div class="admin-card" id="match-predictions-card" style="display:none;">
+          <h3 style="color:var(--primary); margin-bottom:12px;" id="pred-match-title">Chi tiết Bình chọn trận đấu</h3>
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Người chơi</th>
+                  <th>Dự đoán của họ</th>
+                  <th>Thời gian gửi</th>
+                </tr>
+              </thead>
+              <tbody id="match-pred-rows">
+                <!-- Sẽ render bằng JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Wrapper cho Footer (sẽ được mod_ui render) -->
+  <div id="footer-wrapper"></div>
+
+  <!-- Scripts stack -->
+  <script src="js/config.js"></script>
+  <script src="js/scoring_rules.js"></script>
+  <script src="js/mod_auth.js"></script>
+  <script src="js/mod_sheets.js"></script>
+  <script src="js/mod_api.js"></script>
+  <script src="js/mod_matches.js"></script>
+  <script src="js/mod_predictions.js"></script>
+  <script src="js/mod_scoring.js"></script>
+  <script src="js/mod_ui.js"></script>
+
+  <!-- Script trang Admin -->
+  <script>
+    let localMatches = [];
+    let localUsers = [];
+    let localPredictions = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await auth.init();
+      ui.initPage();
+
+      const user = auth.getCurrentUser();
+      const isAdmin = await auth.isAdmin();
+
+      // Kiểm tra quyền Admin
+      if (!isAdmin) {
+        document.getElementById('access-denied-zone').style.display = 'block';
+        return;
+      }
+
+      document.getElementById('admin-main-zone').style.display = 'block';
+
+      // Ẩn/Hiện khu vực Mock Simulator
+      if (!CONFIG.USE_MOCK_DATA) {
+        document.getElementById('mock-simulator-card').style.display = 'none';
+        document.getElementById('sync-mode-text').textContent = 'API Thật';
+        document.getElementById('sync-mode-text').className = 'admin-badge';
+      }
+
+      // Khởi tạo các sự kiện nút
+      document.getElementById('btn-recalculate-all').addEventListener('click', handleRecalculateAll);
+      document.getElementById('btn-sync-api').addEventListener('click', handleSyncAPI);
+
+      // Tải dữ liệu toàn bộ
+      await loadAdminData();
+
+      // Bắt đầu Auto Sync với callback ghi log console
+      api.startAutoSync((status) => {
+        document.getElementById('sync-active-count').textContent = status.activeCount;
+        document.getElementById('sync-last-time').textContent = status.lastSync || 'Chưa chạy';
+        
+        if (status.matches && status.matches.length > 0) {
+          status.matches.forEach(m => {
+            logConsole(`AutoSync: Đang poll trạng thái trận ${m.home_team} vs ${m.away_team} (${m.status})`);
+          });
+        }
+      });
+
+      // Lắng nghe sự kiện đồng bộ tự động từ api để vẽ lại bảng trận đấu
+      window.addEventListener('football_data_synced', loadAdminData);
+    });
+
+    function logConsole(message) {
+      const consoleBox = document.getElementById('console-logs');
+      const time = new Date().toLocaleTimeString('vi-VN');
+      consoleBox.insertAdjacentHTML('beforeend', `<div class="simulation-log-item">[${time}] ${message}</div>`);
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+
+    async function loadAdminData() {
+      try {
+        localMatches = await sheets.getMatches();
+        localUsers = await sheets.getUsers();
+        localPredictions = await sheets.getPredictions();
+
+        renderMatches();
+        renderUsers();
+      } catch (e) {
+        console.error('Admin Panel: Lỗi load dữ liệu:', e);
+        logConsole(`Lỗi: Không thể load dữ liệu từ Sheets DB: ${e.message}`);
+      }
+    }
+
+    // Vẽ danh sách trận đấu
+    function renderMatches() {
+      const tbody = document.getElementById('admin-match-rows');
+      if (localMatches.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Không có trận đấu nào.</td></tr>';
+        return;
+      }
+
+      // Sắp xếp trận đấu theo thời gian
+      const sorted = [...localMatches].sort((a, b) => new Date(a.kickoff_time) - new Date(b.kickoff_time));
+
+      let html = '';
+      sorted.forEach(m => {
+        const isLocked = matches.isLocked(m);
+        const rules = SCORING_RULES[m.phase] || SCORING_RULES.GROUP;
+
+        let statusBadge = '';
+        if (m.status === 'SCHEDULED') {
+          statusBadge = '<span class="match-status-badge status-scheduled">Sắp đá</span>';
+        } else if (m.status === 'IN_PLAY') {
+          statusBadge = '<span class="match-status-badge status-in-play">LIVE</span>';
+        } else if (m.status === 'FINISHED') {
+          statusBadge = '<span class="match-status-badge status-finished">FINISHED</span>';
+        }
+
+        // Ô nhập tỷ số cho phép override kết quả
+        const resultOptions = `
+          <div style="display:flex; flex-direction:column; align-items:center; gap:4px; margin: 0 auto; max-width: 120px;">
+            <div style="display:flex; align-items:center; gap:4px;">
+              <input type="number" min="0" id="score-home-${m.match_id}" class="admin-select" value="${m.home_score !== undefined ? m.home_score : ''}" placeholder="-" style="width:40px; text-align:center; padding:2px; font-size:0.8rem;">
+              <span style="font-size:0.8rem;">-</span>
+              <input type="number" min="0" id="score-away-${m.match_id}" class="admin-select" value="${m.away_score !== undefined ? m.away_score : ''}" placeholder="-" style="width:40px; text-align:center; padding:2px; font-size:0.8rem;">
+            </div>
+            <button class="filter-btn" style="padding:2px 6px; font-size:0.65rem; margin-top:2px; width:100%;" onclick="saveOverrideScore('${m.match_id}')">Lưu</button>
+          </div>
+        `;
+
+        const isManual = m.result_source === 'manual';
+        const sourceBadge = isManual ? '<span style="font-size:0.65rem; color:var(--accent); display:block;">Ghi đè Admin</span>' : '<span style="font-size:0.65rem; color:var(--text-muted); display:block;">Tự động API</span>';
+
+        html += `
+          <tr>
+            <td>
+              <div style="font-weight:700;">${m.home_team} vs ${m.away_team}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">${matches.formatKickoffTime(m.kickoff_time)}</div>
+            </td>
+            <td>
+              <div>${m.phase === 'GROUP' ? 'Vòng bảng' : 'Loại trực tiếp'}</div>
+              <span style="font-size:0.7rem; color:var(--text-muted);">${m.competition}</span>
+            </td>
+            <td>${statusBadge}</td>
+            <td style="text-align:center;">
+              ${resultOptions}
+              ${m.result ? sourceBadge : ''}
+            </td>
+            <td style="text-align:center;">
+              <button class="filter-btn" style="padding:4px 10px; font-size:0.75rem;" onclick="viewPredictionsForMatch('${m.match_id}')">
+                Xem bình chọn
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    // Vẽ danh sách User
+    function renderUsers() {
+      const tbody = document.getElementById('admin-user-rows');
+      if (localUsers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Không có người chơi nào.</td></tr>';
+        return;
+      }
+
+      let html = '';
+      localUsers.forEach(u => {
+        const joinDate = u.joined_at ? new Date(u.joined_at).toLocaleDateString('vi-VN') : 'Chưa rõ';
+        const avatarUrl = u.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(u.name)}`;
+
+        html += `
+          <tr>
+            <td>
+              <div class="leaderboard-user">
+                <img src="${avatarUrl}" alt="avatar" class="leaderboard-avatar" style="width:28px; height:28px;">
+                <span class="leaderboard-name" style="font-size:0.9rem;">${u.name}</span>
+              </div>
+            </td>
+            <td style="font-size:0.85rem; color:var(--text-medium);">${u.email}</td>
+            <td style="font-size:0.85rem; color:var(--text-muted);">${joinDate}</td>
+            <td style="text-align:center;">
+              ${u.google_id === 'mock_admin_1' ? `
+                <span class="admin-badge">Admin chính</span>
+              ` : `
+                <select class="admin-select" onchange="toggleAdminRole('${u.google_id}', this.value)" style="font-size:0.8rem; padding:4px 8px;">
+                  <option value="false" ${!u.is_admin ? 'selected' : ''}>Player</option>
+                  <option value="true" ${u.is_admin ? 'selected' : ''}>Admin</option>
+                </select>
+              `}
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    // Xem danh sách bình chọn của 1 trận đấu cụ thể
+    function viewPredictionsForMatch(matchId) {
+      const match = localMatches.find(m => m.match_id === matchId);
+      if (!match) return;
+
+      const card = document.getElementById('match-predictions-card');
+      const title = document.getElementById('pred-match-title');
+      const tbody = document.getElementById('match-pred-rows');
+
+      title.innerHTML = `Chi tiết Bình chọn trận: <span style="color:var(--primary);">${match.home_team} vs ${match.away_team}</span>`;
+      
+      const matchPreds = localPredictions.filter(p => p.match_id === matchId);
+
+      if (matchPreds.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:15px; color:var(--text-muted);">Không ai bình chọn cho trận này.</td></tr>';
+      } else {
+        let html = '';
+        matchPreds.forEach(p => {
+          const userObj = localUsers.find(u => u.google_id === p.user_id) || { name: `User ID: ${p.user_id}` };
+          
+          let choiceLabel = 'Hòa';
+          if (p.prediction === 'W') choiceLabel = `Thắng (${match.home_team})`;
+          if (p.prediction === 'L') choiceLabel = `Thắng (${match.away_team})`;
+
+          const submitTime = p.submitted_at ? new Date(p.submitted_at).toLocaleTimeString('vi-VN') + ' ' + new Date(p.submitted_at).toLocaleDateString('vi-VN') : 'Chưa rõ';
+
+          html += `
+            <tr>
+              <td style="font-weight:600;">${userObj.name}</td>
+              <td><span class="pred-badge">${choiceLabel}</span></td>
+              <td style="font-size:0.8rem; color:var(--text-muted);">${submitTime}</td>
+            </tr>
+          `;
+        });
+        tbody.innerHTML = html;
+      }
+
+      card.style.display = 'block';
+      // Cuộn màn hình tới phần chi tiết bình chọn
+      card.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Sửa đổi tỷ số & kết quả thủ công từ Admin (Result Override)
+    async function saveOverrideScore(matchId) {
+      const match = localMatches.find(m => m.match_id === matchId);
+      if (!match) return;
+
+      const homeVal = document.getElementById(`score-home-${matchId}`).value.trim();
+      const awayVal = document.getElementById(`score-away-${matchId}`).value.trim();
+
+      if (homeVal === '' || awayVal === '') {
+        // Nếu xóa trống, đưa về chưa đá
+        logConsole(`Admin: Hủy kết quả trận ${match.home_team} vs ${match.away_team}.`);
+        match.status = 'SCHEDULED';
+        match.result = '';
+        match.home_score = '';
+        match.away_score = '';
+        match.result_source = 'auto';
+        match.result_updated_at = new Date().toISOString();
+      } else {
+        const homeScore = parseInt(homeVal);
+        const awayScore = parseInt(awayVal);
+
+        if (isNaN(homeScore) || isNaN(awayScore) || homeScore < 0 || awayScore < 0) {
+          alert('Tỷ số phải là số nguyên không âm!');
+          return;
+        }
+
+        let outcome = 'D';
+        if (homeScore > awayScore) outcome = 'W';
+        else if (homeScore < awayScore) outcome = 'L';
+
+        // Kiểm tra xem vòng này có cho phép hòa không
+        const rules = SCORING_RULES[match.phase] || SCORING_RULES.GROUP;
+        if (outcome === 'D' && !rules.allow_draw) {
+          alert('Vòng loại trực tiếp không có kết quả Hòa! Hãy nhập tỷ số phụ/penalty thắng vào.');
+          return;
+        }
+
+        logConsole(`Admin: Ghi đè tỷ số trận ${match.home_team} vs ${match.away_team} thành: ${homeScore} - ${awayScore} (${outcome})`);
+        match.status = 'FINISHED';
+        match.result = outcome;
+        match.home_score = homeScore;
+        match.away_score = awayScore;
+        match.result_source = 'manual';
+        match.result_updated_at = new Date().toISOString();
+      }
+
+      ui.showToast('Đang cập nhật kết quả...', 'success');
+      
+      // Upsert vào Sheets DB
+      await sheets.upsertMatch(match);
+      
+      // Tính lại điểm
+      await scoring.recalculateForMatch(matchId);
+      
+      ui.showToast('Ghi đè kết quả & cập nhật điểm số thành công!', 'success');
+      logConsole(`Hệ thống: Đồng bộ điểm thành công cho trận ${match.match_id}`);
+      
+      await loadAdminData();
+    }
+
+    // Phân quyền admin cho người chơi khác
+    async function toggleAdminRole(userId, val) {
+      const targetUser = localUsers.find(u => u.google_id === userId);
+      if (!targetUser) return;
+
+      const isAdmin = (val === 'true');
+      logConsole(`Admin: Thay đổi quyền của ${targetUser.name} thành: ${isAdmin ? 'Admin' : 'Player'}`);
+
+      // Để cập nhật thuộc tính is_admin của row trong Google Sheets:
+      // Tìm vị trí row trong bảng Users
+      const index = localUsers.findIndex(u => u.google_id === userId);
+      if (index !== -1) {
+        localUsers[index].is_admin = isAdmin;
+        
+        if (CONFIG.USE_MOCK_DATA) {
+          // Lưu mock
+          sheets._setMockStorage('Users', localUsers);
+        } else {
+          // Ghi đè dòng đó trong sheet
+          const rowNum = index + 2;
+          const userRow = [
+            targetUser.google_id,
+            targetUser.email,
+            targetUser.name,
+            targetUser.avatar_url,
+            isAdmin ? 'TRUE' : 'FALSE',
+            targetUser.joined_at
+          ];
+          await sheets._fetchSheetsAPI(`Users!A${rowNum}:F${rowNum}`, 'PUT', { values: [userRow] });
+        }
+        ui.showToast(`Đã chuyển quyền ${targetUser.name} thành ${isAdmin ? 'Admin' : 'Người chơi'}!`, 'success');
+      }
+
+      await loadAdminData();
+    }
+
+    // Tính toán lại điểm thủ công
+    async function handleRecalculateAll() {
+      logConsole('Admin: Yêu cầu tính toán lại điểm thủ công toàn hệ thống...');
+      ui.showToast('Đang quét và tính toán điểm số...', 'success');
+
+      try {
+        await scoring.recalculateAll();
+        ui.showToast('Đã tính toán lại toàn bộ điểm số!', 'success');
+        logConsole('Hệ thống: Hoàn thành tính lại điểm toàn bộ người chơi.');
+        await loadAdminData();
+      } catch (e) {
+        ui.showToast('Lỗi khi tính điểm: ' + e.message, 'error');
+        logConsole(`Lỗi: ${e.message}`);
+      }
+    }
+
+    // Đồng bộ lịch thi đấu thủ công
+    async function handleSyncAPI() {
+      logConsole('Admin: Bắt đầu tải lịch thi đấu API bóng đá...');
+      ui.showToast('Đang fetch dữ liệu lịch thi đấu...', 'success');
+
+      try {
+        const matchesList = await api.getMatches(true); // forceRefresh = true
+        ui.showToast(`Đồng bộ thành công ${matchesList.length} trận đấu!`, 'success');
+        logConsole(`Hệ thống: Đã cập nhật xong ${matchesList.length} trận đấu từ API.`);
+        await loadAdminData();
+      } catch (e) {
+        ui.showToast('Lỗi khi sync API: ' + e.message, 'error');
+        logConsole(`Lỗi sync: ${e.message}`);
+      }
+    }
+
+    // Trình giả lập trận đấu (Simulation Events)
+    async function simulateMatchEvent(type) {
+      if (type === 'start_live') {
+        const sched = localMatches.filter(m => m.status === 'SCHEDULED');
+        if (sched.length === 0) {
+          logConsole('Giả lập: Không có trận SCHEDULED nào để chuyển sang LIVE.');
+          return;
+        }
+
+        // Chuyển 2 trận đầu tiên sang IN_PLAY
+        const targetMatches = sched.slice(0, 2);
+        for (const m of targetMatches) {
+          m.status = 'IN_PLAY';
+          await sheets.upsertMatch(m);
+          logConsole(`Giả lập: Trận ${m.home_team} vs ${m.away_team} đang đá trực tiếp (LIVE)!`);
+        }
+        ui.showToast('Đã kích hoạt LIVE các trận đấu!', 'success');
+        await loadAdminData();
+      } 
+      
+      else if (type === 'finish_random') {
+        const live = localMatches.filter(m => m.status === 'IN_PLAY');
+        if (live.length === 0) {
+          logConsole('Giả lập: Không có trận đấu nào đang đá LIVE.');
+          return;
+        }
+
+        // Kết thúc trận đầu tiên
+        const m = live[0];
+        m.status = 'FINISHED';
+        const rule = SCORING_RULES[m.phase] || SCORING_RULES.GROUP;
+        const options = rule.allow_draw ? ['W', 'D', 'L'] : ['W', 'L'];
+        m.result = options[Math.floor(Math.random() * options.length)];
+        m.result_source = 'auto';
+        m.result_updated_at = new Date().toISOString();
+
+        logConsole(`Giả lập: Kết thúc trận ${m.home_team} vs ${m.away_team}. Kết quả: ${m.result}`);
+        
+        await sheets.upsertMatch(m);
+        await scoring.recalculateForMatch(m.match_id);
+        
+        ui.showToast(`Trận ${m.home_team} vs ${m.away_team} đã kết thúc!`, 'success');
+        await loadAdminData();
+      }
+    }
+  </script>
+</body>
+</html>

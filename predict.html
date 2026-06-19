@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bình chọn Dự đoán - World Cup Challenge</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Wrapper cho Header (sẽ được mod_ui render) -->
+  <div id="header-wrapper"></div>
+
+  <main class="container">
+    <section>
+      <div class="section-header-row">
+        <h2 class="section-title">Bình chọn Dự đoán</h2>
+        <span id="predict-user-alert" style="color: var(--accent); font-size: 0.85rem; font-weight: 600;"></span>
+      </div>
+
+      <!-- Thanh bộ lọc -->
+      <div class="filter-bar">
+        <div class="filter-buttons">
+          <button class="filter-btn active" data-filter="all">Tất cả</button>
+          <button class="filter-btn" data-filter="GROUP">Vòng bảng</button>
+          <button class="filter-btn" data-filter="KNOCKOUT">Loại trực tiếp</button>
+          <button class="filter-btn" data-filter="voted">Đã dự đoán</button>
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-muted);">
+          * Đóng bình chọn <b>60 phút</b> trước giờ lăn bóng.
+        </div>
+      </div>
+
+      <!-- Danh sách trận đấu bình chọn -->
+      <div class="matches-grid" id="predict-matches-list">
+        <div class="spinner-container">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Wrapper cho Footer (sẽ được mod_ui render) -->
+  <div id="footer-wrapper"></div>
+
+  <!-- Scripts stack -->
+  <script src="js/config.js"></script>
+  <script src="js/scoring_rules.js"></script>
+  <script src="js/mod_auth.js"></script>
+  <script src="js/mod_sheets.js"></script>
+  <script src="js/mod_api.js"></script>
+  <script src="js/mod_matches.js"></script>
+  <script src="js/mod_predictions.js"></script>
+  <script src="js/mod_scoring.js"></script>
+  <script src="js/mod_ui.js"></script>
+
+  <!-- Script trang bình chọn -->
+  <script>
+    let currentFilter = 'all';
+    let localMatches = [];
+    let localMyPredictions = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await auth.init();
+      ui.initPage();
+
+      const user = auth.getCurrentUser();
+      const alertZone = document.getElementById('predict-user-alert');
+      if (!user) {
+        alertZone.textContent = '⚠️ Đăng nhập để thực hiện bình chọn!';
+      }
+
+      // Xử lý nút bộ lọc
+      const filterBtns = document.querySelectorAll('.filter-btn');
+      filterBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          filterBtns.forEach(b => b.classList.remove('active'));
+          e.target.classList.add('active');
+          currentFilter = e.target.dataset.filter;
+          renderMatches();
+        });
+      });
+
+      // Tải và vẽ danh sách
+      await loadData();
+
+      // Đăng ký sự kiện
+      window.addEventListener('football_data_synced', loadData);
+      window.addEventListener('prediction_updated', async (e) => {
+        // Tải lại dự đoán từ database để đảm bảo khớp dữ liệu
+        localMyPredictions = await predictions.getMyPredictions();
+        renderMatches();
+      });
+
+      // Bật sync kết quả tự động ở nền
+      api.startAutoSync();
+    });
+
+    async function loadData() {
+      try {
+        const user = auth.getCurrentUser();
+        const allMatches = await api.getMatches();
+        
+        // Lọc các trận đấu cho trang bình chọn (chưa kết thúc hoặc sắp diễn ra)
+        localMatches = matches.getPredictableMatches(allMatches);
+
+        if (user) {
+          localMyPredictions = await predictions.getMyPredictions();
+        } else {
+          localMyPredictions = [];
+        }
+
+        renderMatches();
+      } catch (e) {
+        console.error('Lỗi khi tải dữ liệu bình chọn:', e);
+        document.getElementById('predict-matches-list').innerHTML = `
+          <div class="empty-state" style="grid-column: 1 / -1; color: #ef4444;">
+            <p>Đã xảy ra lỗi khi tải danh sách trận đấu.</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderMatches() {
+      const container = document.getElementById('predict-matches-list');
+      const user = auth.getCurrentUser();
+
+      // Áp dụng bộ lọc
+      let filtered = [...localMatches];
+      
+      if (currentFilter === 'GROUP') {
+        filtered = filtered.filter(m => m.phase === 'GROUP');
+      } else if (currentFilter === 'KNOCKOUT') {
+        filtered = filtered.filter(m => m.phase === 'KNOCKOUT');
+      } else if (currentFilter === 'voted') {
+        const votedMatchIds = localMyPredictions.map(p => p.match_id);
+        filtered = filtered.filter(m => votedMatchIds.includes(m.match_id));
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state" style="grid-column: 1 / -1;">
+            <p>Không tìm thấy trận đấu nào phù hợp với bộ lọc.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Map dự đoán của user để tra cứu O(1)
+      const myPredsMap = localMyPredictions.reduce((acc, p) => {
+        acc[p.match_id] = p.prediction;
+        return acc;
+      }, {});
+
+      let html = '';
+      filtered.forEach(m => {
+        const isLocked = matches.isLocked(m);
+        const myChoice = myPredsMap[m.match_id] || '';
+        const countdownText = matches.getLockCountdown(m);
+        const rules = SCORING_RULES[m.phase] || SCORING_RULES.GROUP;
+
+        let statusText = 'Sắp đá';
+        let statusClass = 'status-scheduled';
+        if (m.status === 'IN_PLAY') {
+          statusText = 'Trực tiếp';
+          statusClass = 'status-in-play';
+        }
+
+        html += `
+          <div class="match-card">
+            <div class="match-meta">
+              <span class="match-phase">${m.phase === 'GROUP' ? 'Vòng bảng' : 'Loại trực tiếp'}</span>
+              <span class="match-countdown ${isLocked ? 'locked' : ''}">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                ${countdownText}
+              </span>
+            </div>
+
+            <div class="match-teams-row">
+              <div class="team-box">
+                ${ui.renderFlag(m.home_team)}
+                <span class="team-name" title="${m.home_team}">${m.home_team}</span>
+              </div>
+              
+              <div class="match-score-vs">
+                <span class="match-status-badge ${statusClass}">${statusText}</span>
+                ${m.status === 'IN_PLAY' ? (() => {
+                  const hScore = (m.home_score !== undefined && m.home_score !== null && m.home_score !== '' && String(m.home_score) !== 'undefined') ? m.home_score : '0';
+                  const aScore = (m.away_score !== undefined && m.away_score !== null && m.away_score !== '' && String(m.away_score) !== 'undefined') ? m.away_score : '0';
+                  return `<span class="match-live-score" style="font-size:1.4rem; color:var(--primary); margin-top:8px;">${hScore} - ${aScore}</span>`;
+                })() : `
+                  <span style="font-size:0.75rem; font-weight:800; color:var(--text-muted); margin-top:8px;">VS</span>
+                `}
+              </div>
+              
+              <div class="team-box">
+                ${ui.renderFlag(m.away_team)}
+                <span class="team-name" title="${m.away_team}">${m.away_team}</span>
+              </div>
+            </div>
+
+            <div style="font-size:0.75rem; text-align:center; color:var(--text-muted); margin-bottom:16px;">
+              Giờ đá: ${matches.formatKickoffShort(m.kickoff_time)}
+            </div>
+
+            <!-- Giao diện nút bình chọn -->
+            <div class="predict-actions-wrapper">
+              <div style="font-size:0.8rem; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-align:center;">
+                Dự đoán đội thắng cuộc:
+              </div>
+              <div class="predict-actions">
+                <button class="predict-btn ${myChoice === 'W' ? 'active' : ''}" 
+                        ${(!user || isLocked) ? 'disabled' : ''} 
+                        onclick="handleVote('${m.match_id}', 'W')">
+                  <span>${m.home_team}</span>
+                  <span class="btn-sub-label">Chủ nhà</span>
+                </button>
+                
+                ${rules.allow_draw ? `
+                  <button class="predict-btn ${myChoice === 'D' ? 'active' : ''}" 
+                          ${(!user || isLocked) ? 'disabled' : ''} 
+                          onclick="handleVote('${m.match_id}', 'D')">
+                    <span>Hòa</span>
+                    <span class="btn-sub-label">Vòng bảng</span>
+                  </button>
+                ` : ''}
+
+                <button class="predict-btn ${myChoice === 'L' ? 'active' : ''}" 
+                        ${(!user || isLocked) ? 'disabled' : ''} 
+                        onclick="handleVote('${m.match_id}', 'L')">
+                  <span>${m.away_team}</span>
+                  <span class="btn-sub-label">Khách</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // Hàm gọi khi bấm nút Vote (optimistic UI update + gửi lên DB)
+    async function handleVote(matchId, val) {
+      const user = auth.getCurrentUser();
+      if (!user) {
+        ui.showToast('Vui lòng đăng nhập bằng tài khoản Google để bình chọn!', 'error');
+        return;
+      }
+
+      // Hiệu ứng Optimistic UI: Gán lựa chọn ngay lập tức trên màn hình
+      const btns = document.querySelectorAll(`button[onclick*="${matchId}"]`);
+      btns.forEach(btn => btn.classList.remove('active'));
+      
+      const targetBtn = Array.from(btns).find(btn => btn.getAttribute('onclick').includes(val));
+      if (targetBtn) targetBtn.classList.add('active');
+
+      ui.showToast('Đang gửi bình chọn...', 'success');
+
+      // Gửi thực tế
+      const ok = await predictions.submit(matchId, val);
+      if (ok) {
+        ui.showToast('Lưu dự đoán thành công!', 'success');
+      } else {
+        ui.showToast('Lỗi khi lưu bình chọn. Vui lòng thử lại.', 'error');
+        // Reload lại dữ liệu để hoàn tác UI lỗi
+        loadData();
+      }
+    }
+  </script>
+</body>
+</html>
