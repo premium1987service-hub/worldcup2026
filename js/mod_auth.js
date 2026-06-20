@@ -89,8 +89,9 @@ const auth = {
             // Check & Upsert user vào Sheet thông qua mod_sheets
             const appUser = await sheets.registerUser(tempUser);
 
-            this._currentUser = appUser;
-            localStorage.setItem(this._sessionKey, JSON.stringify(appUser));
+            // Giữ lại token xác thực từ tempUser vì registerUser trả về dữ liệu từ Sheet (không có token)
+            this._currentUser = { ...appUser, token: tempUser.token, token_expiry: tempUser.token_expiry };
+            localStorage.setItem(this._sessionKey, JSON.stringify(this._currentUser));
             
             if (callback) callback(appUser);
           }
