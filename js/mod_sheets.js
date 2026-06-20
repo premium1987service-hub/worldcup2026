@@ -16,8 +16,9 @@ const sheets = {
   initDB() {
     if (!CONFIG.USE_MOCK_DATA) return;
 
-    // 1. Tạo danh sách trận đấu giả lập nếu chưa có
-    if (!this._getMockStorage('Matches')) {
+    // 1. Tạo danh sách trận đấu giả lập nếu chưa có hoặc thiếu số lượng (dưới 104 trận)
+    const existingMatches = this._getMockStorage('Matches');
+    if (!existingMatches || existingMatches.length < 104) {
       const anchorDate = new Date('2026-06-20T00:00:00Z');
       const mockMatches = (typeof WC2026_FIXTURES !== 'undefined' ? WC2026_FIXTURES : []).map(fixture => {
         const match = { ...fixture };
