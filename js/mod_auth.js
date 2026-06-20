@@ -154,8 +154,11 @@ const auth = {
     
     // Nếu thực tế, kiểm tra với dữ liệu trên Google Sheets để tránh người dùng tự sửa localStorage
     const users = await sheets.getUsers();
-    const dbUser = users.find(u => u.google_id === this._currentUser.google_id);
-    return dbUser ? dbUser.is_admin === true || dbUser.is_admin === 'TRUE' : false;
+    const dbUser = users.find(u => 
+      String(u.google_id) === String(this._currentUser.google_id) || 
+      (u.email && this._currentUser.email && u.email.toLowerCase().trim() === this._currentUser.email.toLowerCase().trim())
+    );
+    return dbUser ? (dbUser.is_admin === true || String(dbUser.is_admin).trim().toUpperCase() === 'TRUE') : false;
   },
 
   // Guard: chuyển hướng nếu chưa đăng nhập
