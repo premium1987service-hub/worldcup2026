@@ -132,6 +132,15 @@ const ui = {
         });
       }
     }, 100);
+
+    // Kiểm tra bất đồng bộ trạng thái Admin thực tế để cập nhật nóng menu
+    if (user && !isAdmin && !CONFIG.USE_MOCK_DATA) {
+      auth.isAdmin().then(isAdminDB => {
+        if (isAdminDB) {
+          ui.renderHeader();
+        }
+      }).catch(e => console.error('Lỗi kiểm tra admin nền:', e));
+    }
   },
 
   // Tạo Banner báo hiệu đang ở chế độ Demo Mock và bảng chọn user
