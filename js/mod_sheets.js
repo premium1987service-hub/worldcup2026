@@ -18,137 +18,49 @@ const sheets = {
 
     // 1. Tạo danh sách trận đấu giả lập nếu chưa có
     if (!this._getMockStorage('Matches')) {
-      const mockMatches = [
-        // Trận đấu vòng bảng đã diễn ra (World Cup 2026 - Lịch sử thật)
-        {
-          match_id: 'wc26_m1',
-          home_team: 'Mexico',
-          away_team: 'South Africa',
-          kickoff_time: '2026-06-11T20:00:00Z',
-          phase: 'GROUP',
-          competition: 'WC',
-          status: 'FINISHED',
-          result: 'W', // Mexico thắng
-          result_source: 'auto',
-          result_updated_at: '2026-06-11T22:00:00Z',
-          home_score: 2,
-          away_score: 0
-        },
-        {
-          match_id: 'wc26_m2',
-          home_team: 'USA',
-          away_team: 'Paraguay',
-          kickoff_time: '2026-06-12T20:00:00Z',
-          phase: 'GROUP',
-          competition: 'WC',
-          status: 'FINISHED',
-          result: 'W', // USA thắng
-          result_source: 'auto',
-          result_updated_at: '2026-06-12T22:00:00Z',
-          home_score: 4,
-          away_score: 1
-        },
-        {
-          match_id: 'wc26_m3',
-          home_team: 'Germany',
-          away_team: 'Curacao',
-          kickoff_time: '2026-06-15T18:00:00Z',
-          phase: 'GROUP',
-          competition: 'WC',
-          status: 'FINISHED',
-          result: 'W', // Đức thắng
-          result_source: 'auto',
-          result_updated_at: '2026-06-15T20:00:00Z',
-          home_score: 7,
-          away_score: 1
-        },
-        {
-          match_id: 'wc26_m4',
-          home_team: 'Ivory Coast',
-          away_team: 'Ecuador',
-          kickoff_time: '2026-06-15T21:00:00Z',
-          phase: 'GROUP',
-          competition: 'WC',
-          status: 'FINISHED',
-          result: 'W', // Bờ Biển Ngà thắng
-          result_source: 'auto',
-          result_updated_at: '2026-06-15T23:00:00Z',
-          home_score: 1,
-          away_score: 0
-        },
-        {
-          match_id: 'wc26_m5',
-          home_team: 'Netherlands',
-          away_team: 'Japan',
-          kickoff_time: '2026-06-15T21:00:00Z',
-          phase: 'GROUP',
-          competition: 'WC',
-          status: 'FINISHED',
-          result: 'D', // Hòa
-          result_source: 'auto',
-          result_updated_at: '2026-06-15T23:00:00Z',
-          home_score: 2,
-          away_score: 2
-        },
-        // Trận đấu đang diễn ra Live ngay bây giờ (20/06/2026)
-        {
-          match_id: 'wc26_m6',
-          home_team: 'Netherlands',
-          away_team: 'Sweden',
-          kickoff_time: new Date(Date.now() - 45 * 60000).toISOString(), // Bắt đầu từ 45 phút trước (Đang LIVE)
-          phase: 'GROUP',
-          competition: 'WC',
-          status: 'IN_PLAY',
-          result: '',
-          result_source: 'auto',
-          result_updated_at: new Date().toISOString(),
-          home_score: 1,
-          away_score: 1
-        },
-        // Trận sắp diễn ra nổi bật tiếp theo trong 24h
-        {
-          match_id: 'wc26_m7',
-          home_team: 'Germany',
-          away_team: 'Ivory Coast',
-          kickoff_time: new Date(Date.now() + 2 * 3600000).toISOString(), // 2 giờ nữa
-          phase: 'GROUP',
-          competition: 'WC',
-          status: 'SCHEDULED',
-          result: '',
-          result_source: 'auto',
-          result_updated_at: '',
-          home_score: '',
-          away_score: ''
-        },
-        {
-          match_id: 'wc26_m8',
-          home_team: 'Ecuador',
-          away_team: 'Curacao',
-          kickoff_time: new Date(Date.now() + 5 * 3600000).toISOString(), // 5 giờ nữa
-          phase: 'GROUP',
-          competition: 'WC',
-          status: 'SCHEDULED',
-          result: '',
-          result_source: 'auto',
-          result_updated_at: '',
-          home_score: '',
-          away_score: ''
-        },
-        {
-          match_id: 'wc26_m9',
-          home_team: 'Tunisia',
-          away_team: 'Japan',
-          kickoff_time: new Date(Date.now() + 22 * 3600000).toISOString(), // 22 giờ nữa
-          phase: 'GROUP',
-          competition: 'WC',
-          status: 'SCHEDULED',
-          result: '',
-          result_source: 'auto',
-          result_updated_at: '',
-          home_score: '',
-          away_score: ''
+      const anchorDate = new Date('2026-06-20T00:00:00Z');
+      const mockMatches = (typeof WC2026_FIXTURES !== 'undefined' ? WC2026_FIXTURES : []).map(fixture => {
+        const match = { ...fixture };
+        const kickoff = new Date(match.kickoff_time);
+        const timeDiffMs = anchorDate - kickoff;
+
+        if (timeDiffMs > 2 * 60 * 60 * 1000) {
+          // Finished (more than 2 hours ago)
+          match.status = 'FINISHED';
+          const home = Math.floor(Math.random() * 4);
+          const away = Math.floor(Math.random() * 4);
+          match.home_score = home;
+          match.away_score = away;
+          if (home > away) match.result = 'W';
+          else if (home < away) match.result = 'L';
+          else {
+            if (match.phase === 'GROUP') {
+              match.result = 'D';
+            } else {
+              match.result = Math.random() > 0.5 ? 'W' : 'L';
+            }
+          }
+          match.result_source = 'auto';
+          match.result_updated_at = new Date(kickoff.getTime() + 2 * 60 * 60 * 1000).toISOString();
+        } else if (timeDiffMs >= 0) {
+          // In Play (live)
+          match.status = 'IN_PLAY';
+          match.home_score = Math.floor(Math.random() * 2);
+          match.away_score = Math.floor(Math.random() * 2);
+          match.result = '';
+          match.result_source = 'auto';
+          match.result_updated_at = anchorDate.toISOString();
+        } else {
+          // Scheduled
+          match.status = 'SCHEDULED';
+          match.home_score = '';
+          match.away_score = '';
+          match.result = '';
+          match.result_source = 'auto';
+          match.result_updated_at = '';
         }
-      ];
+        return match;
+      });
       this._setMockStorage('Matches', mockMatches);
     }
 
@@ -164,24 +76,24 @@ const sheets = {
     // 3. Tạo một số dự đoán có sẵn để Leaderboard sinh động
     if (!this._getMockStorage('Predictions')) {
       const mockPredictions = [
-        // Trận 1 (Qatar vs Ecuador, kết quả L)
-        { prediction_id: 'p1', user_id: 'mock_admin_1', match_id: 'wc_m1', prediction: 'L', submitted_at: new Date().toISOString() }, // đúng
-        { prediction_id: 'p2', user_id: 'mock_user_2', match_id: 'wc_m1', prediction: 'W', submitted_at: new Date().toISOString() }, // sai
-        { prediction_id: 'p3', user_id: 'mock_user_3', match_id: 'wc_m1', prediction: 'L', submitted_at: new Date().toISOString() }, // đúng
+        // Trận 1 (kết quả L)
+        { prediction_id: 'p1', user_id: 'mock_admin_1', match_id: '1', prediction: 'L', submitted_at: new Date().toISOString() }, // đúng
+        { prediction_id: 'p2', user_id: 'mock_user_2', match_id: '1', prediction: 'W', submitted_at: new Date().toISOString() }, // sai
+        { prediction_id: 'p3', user_id: 'mock_user_3', match_id: '1', prediction: 'L', submitted_at: new Date().toISOString() }, // đúng
 
-        // Trận 2 (Anh vs Iran, kết quả W)
-        { prediction_id: 'p4', user_id: 'mock_admin_1', match_id: 'wc_m2', prediction: 'W', submitted_at: new Date().toISOString() }, // đúng
-        { prediction_id: 'p5', user_id: 'mock_user_2', match_id: 'wc_m2', prediction: 'W', submitted_at: new Date().toISOString() }, // đúng
-        { prediction_id: 'p6', user_id: 'mock_user_3', match_id: 'wc_m2', prediction: 'D', submitted_at: new Date().toISOString() }, // sai
+        // Trận 2 (kết quả W)
+        { prediction_id: 'p4', user_id: 'mock_admin_1', match_id: '2', prediction: 'W', submitted_at: new Date().toISOString() }, // đúng
+        { prediction_id: 'p5', user_id: 'mock_user_2', match_id: '2', prediction: 'W', submitted_at: new Date().toISOString() }, // đúng
+        { prediction_id: 'p6', user_id: 'mock_user_3', match_id: '2', prediction: 'D', submitted_at: new Date().toISOString() }, // sai
 
-        // Trận 3 (Senegal vs Hà Lan, kết quả L)
-        { prediction_id: 'p7', user_id: 'mock_admin_1', match_id: 'wc_m3', prediction: 'D', submitted_at: new Date().toISOString() }, // sai
-        { prediction_id: 'p8', user_id: 'mock_user_2', match_id: 'wc_m3', prediction: 'L', submitted_at: new Date().toISOString() }, // đúng
-        { prediction_id: 'p9', user_id: 'mock_user_3', match_id: 'wc_m3', prediction: 'L', submitted_at: new Date().toISOString() }, // đúng
+        // Trận 3 (kết quả L)
+        { prediction_id: 'p7', user_id: 'mock_admin_1', match_id: '3', prediction: 'D', submitted_at: new Date().toISOString() }, // sai
+        { prediction_id: 'p8', user_id: 'mock_user_2', match_id: '3', prediction: 'L', submitted_at: new Date().toISOString() }, // đúng
+        { prediction_id: 'p9', user_id: 'mock_user_3', match_id: '3', prediction: 'L', submitted_at: new Date().toISOString() }, // đúng
 
-        // Trận 5 (Argentina vs Saudi Arabia, sắp đá)
-        { prediction_id: 'p10', user_id: 'mock_user_2', match_id: 'wc_m5', prediction: 'W', submitted_at: new Date().toISOString() },
-        { prediction_id: 'p11', user_id: 'mock_user_3', match_id: 'wc_m5', prediction: 'W', submitted_at: new Date().toISOString() }
+        // Trận 5 (sắp đá)
+        { prediction_id: 'p10', user_id: 'mock_user_2', match_id: '5', prediction: 'W', submitted_at: new Date().toISOString() },
+        { prediction_id: 'p11', user_id: 'mock_user_3', match_id: '5', prediction: 'W', submitted_at: new Date().toISOString() }
       ];
       this._setMockStorage('Predictions', mockPredictions);
     }
