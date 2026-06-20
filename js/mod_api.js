@@ -1,10 +1,81 @@
 // js/mod_api.js
-// Kết nối API football-data.org, quản lý cache và hệ thống tự động đồng bộ kết quả (Auto-Sync)
+// Kết nối API worldcup26.ir, quản lý cache và hệ thống tự động đồng bộ kết quả (Auto-Sync)
 
 const api = {
   _cacheKey: 'football_api_matches_cache',
   _cacheTimeKey: 'football_api_matches_cache_time',
   _syncIntervalId: null,
+
+  _stadiumOffsets: {
+    '1': -6, '2': -6, '3': -6, // Mexico (CST permanent)
+    '4': -5, '5': -5, '6': -5, // US Central (CDT)
+    '7': -4, '8': -4, '9': -4, '10': -4, '11': -4, '12': -4, // US/Canada Eastern (EDT)
+    '13': -7, '14': -7, '15': -7, '16': -7 // US/Canada Western (PDT)
+  },
+
+  _parseLocalDateToUTC(localDateStr, stadiumId) {
+    // Định dạng: "MM/DD/YYYY HH:mm" -> ví dụ "06/11/2026 13:00"
+    if (!localDateStr) return new Date().toISOString();
+    
+    const parts = localDateStr.split(' ');
+    if (parts.length < 2) return new Date().toISOString();
+    
+    const dateParts = parts[0].split('/');
+    const timeParts = parts[1].split(':');
+    
+    if (dateParts.length < 3 || timeParts.length < 2) return new Date().toISOString();
+    
+    const month = parseInt(dateParts[0], 10);
+    const day = parseInt(dateParts[1], 10);
+    const year = parseInt(dateParts[2], 10);
+    
+    const hour = parseInt(timeParts[0], 10);
+    const minute = parseInt(timeParts[1], 10);
+    
+    const offset = this._stadiumOffsets[stadiumId] || 0;
+    
+    const utcMs = Date.UTC(year, month - 1, day, hour - offset, minute);
+    return new Date(utcMs).toISOString();
+  },
+
+  _mapApiGameToMatch(g) {
+    const kickoff = this._parseLocalDateToUTC(g.local_date, g.stadium_id);
+    const hScore = (g.home_score !== null && g.home_score !== undefined && g.home_score !== '') ? String(g.home_score) : '';
+    const aScore = (g.away_score !== null && g.away_score !== undefined && g.away_score !== '') ? String(g.away_score) : '';
+    
+    let status = 'SCHEDULED';
+    if (g.finished === 'TRUE' || g.finished === true || g.finished === 'true') {
+      status = 'FINISHED';
+    } else if (g.time_elapsed && g.time_elapsed !== 'notstarted') {
+      status = 'IN_PLAY';
+    }
+    
+    let result = '';
+    if (status === 'FINISHED' && hScore !== '' && aScore !== '') {
+      const hs = parseInt(hScore, 10);
+      const as = parseInt(aScore, 10);
+      if (hs > as) result = 'W';
+      else if (hs < as) result = 'L';
+      else {
+        result = (g.type === 'group') ? 'D' : 'W'; // Mặc định luồng bình chọn KO
+      }
+    }
+    
+    return {
+      match_id: String(g.id),
+      home_team: g.home_team_name_en || 'TBD',
+      away_team: g.away_team_name_en || 'TBD',
+      kickoff_time: kickoff,
+      phase: (g.type === 'group') ? 'GROUP' : 'KNOCKOUT',
+      competition: 'WC',
+      status: status,
+      result: result,
+      result_source: 'auto',
+      result_updated_at: new Date().toISOString(),
+      home_score: hScore,
+      away_score: aScore
+    };
+  },
 
   // Lấy danh sách trận đấu (có cache)
   async getMatches(forceRefresh = false) {
@@ -26,32 +97,20 @@ const api = {
       }
     }
 
-    console.log('API: Đang gọi football-data.org để lấy lịch thi đấu mới...');
+    console.log('API: Đang gọi worldcup26.ir để lấy lịch thi đấu mới...');
     try {
-      const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://api.football-data.org/v4/competitions/WC/matches');
-      const response = await fetch(proxyUrl, {
-        headers: { 'X-Auth-Token': CONFIG.FOOTBALL_API_TOKEN }
-      });
+      const response = await fetch('https://worldcup26.ir/get/games');
 
       if (!response.ok) {
         throw new Error(`API response status: ${response.status}`);
       }
 
       const data = await response.json();
-      const matches = data.matches.map(m => ({
-        match_id: String(m.id),
-        home_team: m.homeTeam.name,
-        away_team: m.awayTeam.name,
-        kickoff_time: m.utcDate,
-        phase: m.stage === 'GROUP_STAGE' ? 'GROUP' : 'KNOCKOUT',
-        competition: 'WC',
-        status: m.status, // SCHEDULED, IN_PLAY, PAUSED, FINISHED
-        result: this._parseOutcomeFromRaw(m),
-        result_source: 'auto',
-        result_updated_at: new Date().toISOString(),
-        home_score: m.score && m.score.fullTime && m.score.fullTime.home !== null ? m.score.fullTime.home : '',
-        away_score: m.score && m.score.fullTime && m.score.fullTime.away !== null ? m.score.fullTime.away : ''
-      }));
+      if (!data.games || !Array.isArray(data.games)) {
+        throw new Error('Định dạng dữ liệu API không chính xác (thiếu array games)');
+      }
+      
+      const matches = data.games.map(g => this._mapApiGameToMatch(g));
 
       // Lưu cache
       localStorage.setItem(this._cacheKey, JSON.stringify(matches));
@@ -65,24 +124,22 @@ const api = {
       return matches;
     } catch (e) {
       console.error('Lỗi khi gọi API bóng đá:', e);
-      // Fallback về cache nếu có, bất kể tuổi cache
+      // Fallback về cache cũ nếu có
       if (cachedData) {
         console.warn('API: Fallback về cache cũ do lỗi kết nối');
         return JSON.parse(cachedData);
       }
-      // Hoặc trả về rỗng
+      
+      // Fallback về WC2026_FIXTURES tĩnh nếu không có cache
+      console.warn('API: Fallback về WC2026_FIXTURES tĩnh do lỗi kết nối và không có cache');
+      if (typeof WC2026_FIXTURES !== 'undefined') {
+        for (const match of WC2026_FIXTURES) {
+          await sheets.upsertMatch(match);
+        }
+        return WC2026_FIXTURES;
+      }
       return [];
     }
-  },
-
-  // Phân tích kết quả trận đấu thô từ API football-data.org
-  _parseOutcomeFromRaw(match) {
-    if (match.status !== 'FINISHED') return '';
-    const winner = match.score && match.score.winner;
-    if (winner === 'HOME_TEAM') return 'W';
-    if (winner === 'AWAY_TEAM') return 'L';
-    if (winner === 'DRAW') return 'D';
-    return '';
   },
 
   // Khởi động vòng lặp đồng bộ tự động (Auto-Sync Polling)
@@ -119,8 +176,8 @@ const api = {
           if (match.status === 'SCHEDULED') {
             // Chuyển sang đang đá
             match.status = 'IN_PLAY';
-            match.home_score = 0;
-            match.away_score = 0;
+            match.home_score = '0';
+            match.away_score = '0';
             await sheets.upsertMatch(match);
             console.log(`API AutoSync (Mock): Trận ${match.home_team} vs ${match.away_team} đã bắt đầu đá (0 - 0)!`);
           } else if (match.status === 'IN_PLAY') {
@@ -130,8 +187,8 @@ const api = {
               match.status = 'FINISHED';
               const hScore = Math.floor(Math.random() * 4);
               const aScore = Math.floor(Math.random() * 4);
-              match.home_score = hScore;
-              match.away_score = aScore;
+              match.home_score = String(hScore);
+              match.away_score = String(aScore);
               
               if (hScore > aScore) match.result = 'W';
               else if (hScore < aScore) match.result = 'L';
@@ -153,9 +210,9 @@ const api = {
             } else if (rand > 0.4) {
               // Giả lập bàn thắng ghi khi đang đá
               if (Math.random() > 0.5) {
-                match.home_score = Number(match.home_score || 0) + 1;
+                match.home_score = String(Number(match.home_score || 0) + 1);
               } else {
-                match.away_score = Number(match.away_score || 0) + 1;
+                match.away_score = String(Number(match.away_score || 0) + 1);
               }
               await sheets.upsertMatch(match);
               console.log(`API AutoSync (Mock): Vào!!! Trận ${match.home_team} vs ${match.away_team} tỷ số hiện tại: ${match.home_score} - ${match.away_score}`);
@@ -166,41 +223,46 @@ const api = {
         }
       } else {
         // --- CHẠY THỰC TẾ GỌI API ---
-        for (const match of activeMatches) {
-          try {
-            // Gọi chi tiết 1 trận
-            const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(`https://api.football-data.org/v4/matches/${match.match_id}`);
-            const response = await fetch(proxyUrl, {
-              headers: { 'X-Auth-Token': CONFIG.FOOTBALL_API_TOKEN }
-            });
-            
-            if (!response.ok) continue;
-            const data = await response.json();
-            const apiMatch = data;
-
-            if (apiMatch.status === 'IN_PLAY') {
-              match.status = 'IN_PLAY';
-              match.home_score = apiMatch.score.fullTime.home !== null ? apiMatch.score.fullTime.home : '0';
-              match.away_score = apiMatch.score.fullTime.away !== null ? apiMatch.score.fullTime.away : '0';
-              await sheets.upsertMatch(match);
-            } else if (apiMatch.status === 'FINISHED') {
-              const finalOutcome = this._parseOutcomeFromRaw(apiMatch);
+        try {
+          console.log('API AutoSync: Đang gọi worldcup26.ir để kiểm tra tỷ số trực tiếp...');
+          const response = await fetch('https://worldcup26.ir/get/games');
+          if (!response.ok) throw new Error(`API status ${response.status}`);
+          
+          const data = await response.json();
+          if (data.games && Array.isArray(data.games)) {
+            for (const match of activeMatches) {
+              const apiGame = data.games.find(g => String(g.id) === String(match.match_id));
+              if (!apiGame) continue;
               
-              match.status = 'FINISHED';
-              match.result = finalOutcome;
-              match.home_score = apiMatch.score.fullTime.home !== null ? apiMatch.score.fullTime.home : '';
-              match.away_score = apiMatch.score.fullTime.away !== null ? apiMatch.score.fullTime.away : '';
-              match.result_source = 'auto';
-              match.result_updated_at = new Date().toISOString();
+              const updatedMatch = this._mapApiGameToMatch(apiGame);
               
-              await sheets.upsertMatch(match);
-              
-              // Kích hoạt tính lại điểm cho trận đấu này
-              await scoring.recalculateForMatch(match.match_id);
+              // Chỉ cập nhật nếu có thay đổi
+              if (updatedMatch.status !== match.status || 
+                  updatedMatch.home_score !== match.home_score || 
+                  updatedMatch.away_score !== match.away_score ||
+                  updatedMatch.result !== match.result) {
+                
+                // Giữ kết quả manual nếu có
+                if (match.result_source === 'manual') {
+                  updatedMatch.result = match.result;
+                  updatedMatch.home_score = match.home_score;
+                  updatedMatch.away_score = match.away_score;
+                  updatedMatch.status = match.status;
+                  updatedMatch.result_source = 'manual';
+                }
+                
+                await sheets.upsertMatch(updatedMatch);
+                console.log(`API AutoSync: Cập nhật trận ${updatedMatch.home_team} vs ${updatedMatch.away_team} (${updatedMatch.status}: ${updatedMatch.home_score} - ${updatedMatch.away_score})`);
+                
+                // Cập nhật điểm số khi trận đấu kết thúc
+                if (updatedMatch.status === 'FINISHED' && match.status !== 'FINISHED') {
+                  await scoring.recalculateForMatch(updatedMatch.match_id);
+                }
+              }
             }
-          } catch (e) {
-            console.error(`API AutoSync: Lỗi khi đồng bộ trận ${match.match_id}:`, e);
           }
+        } catch (e) {
+          console.error('API AutoSync: Lỗi khi đồng bộ kết quả trực tiếp:', e);
         }
       }
 
