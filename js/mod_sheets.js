@@ -147,7 +147,7 @@ const sheets = {
         email: row[1],
         name: row[2],
         avatar_url: row[3],
-        is_admin: row[4] === 'TRUE' || row[4] === true,
+        is_admin: String(row[4]).toUpperCase() === 'TRUE' || row[4] === true,
         joined_at: row[5]
       }));
     } catch (e) {
