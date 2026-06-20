@@ -75,15 +75,19 @@ const auth = {
           // Đăng nhập thành công, lấy thông tin profile
           const userInfo = await this._fetchGoogleUserProfile(tokenResponse.access_token);
           if (userInfo) {
-            // Check & Upsert user vào Sheet thông qua mod_sheets
-            const appUser = await sheets.registerUser({
+            const tempUser = {
               google_id: userInfo.sub,
               email: userInfo.email,
               name: userInfo.name,
               avatar_url: userInfo.picture,
               token: tokenResponse.access_token,
               token_expiry: Date.now() + (tokenResponse.expires_in * 1000)
-            });
+            };
+            // Thiết lập user tạm thời để các API gọi trong registerUser có token xác thực
+            this._currentUser = tempUser;
+
+            // Check & Upsert user vào Sheet thông qua mod_sheets
+            const appUser = await sheets.registerUser(tempUser);
 
             this._currentUser = appUser;
             localStorage.setItem(this._sessionKey, JSON.stringify(appUser));
