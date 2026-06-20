@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bảng Xếp Hạng - World Cup Challenge</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Wrapper cho Header (sẽ được mod_ui render) -->
+  <div id="header-wrapper"></div>
+
+  <main class="container">
+    <section>
+      <div class="section-header-row">
+        <h2 class="section-title">Bảng Xếp Hạng Người Chơi</h2>
+        <div style="display:flex; gap:10px;">
+          <!-- Nút Sort nhanh -->
+          <button id="sort-toggle-btn" class="filter-btn active" style="padding:6px 12px; font-size:0.8rem;">
+            Xếp hạng: Điểm cao → Thấp
+          </button>
+        </div>
+      </div>
+
+      <!-- Bảng xếp hạng -->
+      <div class="leaderboard-container">
+        <div class="table-responsive">
+          <table class="leaderboard-table">
+            <thead>
+              <tr>
+                <th style="width: 80px;">Hạng</th>
+                <th>Người chơi</th>
+                <th style="text-align: center; width: 120px;">Điểm số</th>
+                <th style="text-align: center; width: 100px;">Đoán đúng</th>
+                <th style="text-align: center; width: 100px;">Đoán sai</th>
+                <th style="text-align: center; width: 100px;">Đang chờ</th>
+                <th style="width: 180px;">Cập nhật cuối</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-rows">
+              <tr>
+                <td colspan="7">
+                  <div class="spinner-container">
+                    <div class="spinner"></div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Wrapper cho Footer (sẽ được mod_ui render) -->
+  <div id="footer-wrapper"></div>
+
+  <!-- Scripts stack -->
+  <script src="js/config.js"></script>
+  <script src="js/scoring_rules.js"></script>
+  <script src="js/mod_auth.js"></script>
+  <script src="js/wc2026_fixtures.js"></script>
+  <script src="js/mod_sheets.js"></script>
+  <script src="js/mod_api.js"></script>
+  <script src="js/mod_matches.js"></script>
+  <script src="js/mod_predictions.js"></script>
+  <script src="js/mod_scoring.js"></script>
+  <script src="js/mod_ui.js"></script>
+
+  <!-- Script trang Bảng xếp hạng -->
+  <script>
+    let isAscending = false;
+    let localCache = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await auth.init();
+      ui.initPage();
+
+      // Cấu hình nút sắp xếp
+      const sortBtn = document.getElementById('sort-toggle-btn');
+      sortBtn.addEventListener('click', () => {
+        isAscending = !isAscending;
+        sortBtn.textContent = isAscending ? 'Xếp hạng: Điểm thấp → Cao' : 'Xếp hạng: Điểm cao → Thấp';
+        renderLeaderboard();
+      });
+
+      // Tải bảng xếp hạng từ cache Google Sheet
+      await loadLeaderboard();
+
+      // Đăng ký sự kiện
+      window.addEventListener('leaderboard_recalculated', loadLeaderboard);
+      window.addEventListener('football_data_synced', loadLeaderboard);
+
+      // Bật đồng bộ
+      api.startAutoSync();
+    });
+
+    async function loadLeaderboard() {
+      try {
+        localCache = await sheets.getLeaderboardCache();
+        
+        // Nếu cache trống hoàn toàn (lần chạy đầu tiên), kích hoạt tính toán lại toàn bộ
+        if (localCache.length === 0) {
+          console.log('Leaderboard: Cache trống, bắt đầu tính toán lại...');
+          localCache = await scoring.recalculateAll();
+        }
+
+        renderLeaderboard();
+      } catch (e) {
+        console.error('Lỗi khi tải bảng xếp hạng:', e);
+        document.getElementById('leaderboard-rows').innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align: center; color: #ef4444; padding: 20px;">
+              Không thể tải bảng xếp hạng. Hãy chắc chắn đã chạy thiết lập hoặc kiểm tra console.
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    function renderLeaderboard() {
+      const tbody = document.getElementById('leaderboard-rows');
+      const user = auth.getCurrentUser();
+
+      if (localCache.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align: center; padding: 30px;">
+              Chưa có dữ liệu người chơi hoặc điểm số.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      // Clone và sắp xếp
+      let list = [...localCache];
+      if (isAscending) {
+        list.reverse();
+      }
+
+      let html = '';
+      list.forEach((item, index) => {
+        // Xác định hạng thực tế (nếu sắp xếp giảm dần, hạng là index + 1; nếu tăng dần, hạng là length - index)
+        const rank = isAscending ? (list.length - index) : (index + 1);
+        
+        let rankClass = '';
+        if (rank === 1) rankClass = 'rank-1';
+        else if (rank === 2) rankClass = 'rank-2';
+        else if (rank === 3) rankClass = 'rank-3';
+
+        const isMe = user && user.google_id === item.user_id;
+        const rowClass = isMe ? 'my-row' : '';
+
+        // Format thời gian cập nhật
+        let updatedTime = 'Chưa rõ';
+        if (item.last_updated) {
+          const d = new Date(item.last_updated);
+          updatedTime = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        }
+
+        // Tạo ảnh đại diện mặc định dựa trên tên nếu thiếu ảnh đại diện
+        const avatarUrl = item.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(item.name)}`;
+
+        html += `
+          <tr class="${rowClass}">
+            <td>
+              <span class="rank-badge ${rankClass}">${rank}</span>
+            </td>
+            <td>
+              <div class="leaderboard-user">
+                <img src="${avatarUrl}" alt="avatar" class="leaderboard-avatar">
+                <span class="leaderboard-name">${item.name} ${isMe ? ' (Bạn)' : ''}</span>
+              </div>
+            </td>
+            <td style="text-align: center;">
+              <span class="leaderboard-score">${item.total_score}đ</span>
+            </td>
+            <td style="text-align: center; color: var(--primary); font-weight: 600;">
+              ${item.correct || 0}
+            </td>
+            <td style="text-align: center; color: #ef4444; font-weight: 600;">
+              ${item.wrong || 0}
+            </td>
+            <td style="text-align: center; color: var(--text-muted);">
+              ${item.pending || 0}
+            </td>
+            <td style="font-size: 0.8rem; color: var(--text-muted);">
+              ${updatedTime}
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+    }
+  </script>
+</body>
+</html>

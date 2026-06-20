@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Work Plan — Website Dự đoán Bóng đá</title>
+<style>
+  :root {
+    --green:#1a7a4a;--green-l:#e6f4ed;--green-m:#2da05f;
+    --blue:#1a5fa8;--blue-l:#e6eff9;
+    --amber:#b86b00;--amber-l:#fdf3e0;
+    --purple:#5b3fa8;--purple-l:#f0ecfb;
+    --coral:#c0392b;--coral-l:#fdecea;
+    --teal:#0e7a7a;--teal-l:#e3f5f5;
+    --ink:#1a1a1a;--ink2:#444;--ink3:#777;
+    --border:#e0e0e0;--bg:#f7f7f5;--white:#ffffff;
+    --radius:8px;
+    --font-main:'Segoe UI',system-ui,sans-serif;
+    --font-mono:'Fira Code','Cascadia Code',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--font-main);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6;}
+
+  .site-header{background:var(--ink);color:#fff;padding:28px 40px 24px;}
+  .site-header h1{font-size:22px;font-weight:600;letter-spacing:-.3px;}
+  .site-header p{font-size:13px;color:#aaa;margin-top:4px;}
+  .badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .badge{font-size:11px;font-weight:500;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,.12);color:#ddd;}
+
+  .container{max-width:960px;margin:0 auto;padding:32px 24px 60px;}
+
+  /* Principle bar */
+  .principle-bar{
+    background:var(--white);border:1px solid var(--border);border-radius:12px;
+    padding:18px 24px;margin-bottom:24px;
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;
+  }
+  .principle-item{display:flex;gap:10px;align-items:flex-start;}
+  .principle-icon{font-size:18px;flex-shrink:0;margin-top:1px;}
+  .principle-text .pt{font-size:12px;font-weight:600;color:var(--ink2);}
+  .principle-text .ps{font-size:11px;color:var(--ink3);margin-top:1px;}
+
+  /* Responsibility table */
+  .resp-table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0;}
+  .resp-table th{text-align:left;padding:8px 12px;background:#f0f0ee;color:var(--ink2);font-weight:600;border-bottom:1px solid var(--border);}
+  .resp-table td{padding:8px 12px;border-bottom:1px solid #f4f4f2;vertical-align:top;}
+  .resp-table tr:last-child td{border-bottom:none;}
+
+  /* Phase nav */
+  .phase-nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:24px;}
+  .phase-nav a{font-size:12px;font-weight:500;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--white);color:var(--ink2);text-decoration:none;transition:background .15s,color .15s;}
+  .phase-nav a:hover{background:var(--ink);color:#fff;}
+
+  /* Phase blocks */
+  .phase{background:var(--white);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden;}
+  .phase-header{display:flex;align-items:center;gap:14px;padding:16px 22px;cursor:pointer;user-select:none;transition:background .12s;}
+  .phase-header:hover{background:#fafaf8;}
+  .phase-num{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;}
+  .phase-title{font-size:14px;font-weight:600;flex:1;}
+  .phase-sub{font-size:11px;color:var(--ink3);margin-top:2px;}
+  .phase-tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:4px;white-space:nowrap;}
+  .tag-must{background:var(--coral-l);color:var(--coral);}
+  .tag-core{background:var(--blue-l);color:var(--blue);}
+  .tag-mgmt{background:var(--amber-l);color:var(--amber);}
+  .tag-done{background:var(--green-l);color:var(--green);}
+  .tag-new{background:var(--teal-l);color:var(--teal);}
+  .chevron{font-size:18px;color:var(--ink3);transition:transform .2s;flex-shrink:0;}
+  .phase.open .chevron{transform:rotate(90deg);}
+  .phase-body{display:none;padding:0 22px 22px;border-top:1px solid var(--border);}
+  .phase.open .phase-body{display:block;}
+
+  /* Sections */
+  .section{margin-top:18px;}
+  .section-title{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+
+  /* Module grid */
+  .module-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:8px;margin-top:8px;}
+  .module-card{border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;background:var(--bg);}
+  .module-card .mname{font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--purple);margin-bottom:3px;}
+  .module-card .mrole{font-size:11px;color:var(--ink3);line-height:1.5;}
+
+  /* Sheet name badge */
+  .sheet-name{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--green);background:var(--green-l);display:inline-block;padding:2px 8px;border-radius:4px;margin-bottom:6px;margin-top:12px;}
+
+  /* Tables */
+  table{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0;}
+  th{text-align:left;padding:6px 10px;background:#f0f0ee;color:var(--ink2);font-weight:600;border-bottom:1px solid var(--border);}
+  td{padding:6px 10px;border-bottom:1px solid #f4f4f2;vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  code{font-family:var(--font-mono);font-size:11px;background:#f0f0ee;padding:1px 5px;border-radius:3px;color:var(--purple);}
+
+  /* Logic / code box */
+  .logic-box{background:#f8f8f6;border-left:3px solid var(--purple);border-radius:0 var(--radius) var(--radius) 0;padding:12px 14px;font-family:var(--font-mono);font-size:12px;color:var(--ink2);line-height:1.75;margin:8px 0;white-space:pre-wrap;overflow-x:auto;}
+
+  /* Star box for scoring_rules.js */
+  .star-box{background:var(--purple-l);border:1px solid #c9beed;border-radius:var(--radius);padding:14px 16px;margin:10px 0;}
+  .star-box .label{font-size:11px;font-weight:700;color:var(--purple);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;}
+
+  /* Note / warning */
+  .note{background:var(--amber-l);border-left:3px solid var(--amber);border-radius:0 var(--radius) var(--radius) 0;padding:10px 14px;font-size:12px;color:var(--ink2);margin:8px 0;line-height:1.6;}
+  .note-teal{background:var(--teal-l);border-left:3px solid var(--teal);border-radius:0 var(--radius) var(--radius) 0;padding:10px 14px;font-size:12px;color:var(--ink2);margin:8px 0;line-height:1.6;}
+
+  /* Flow */
+  .flow{display:flex;align-items:center;flex-wrap:wrap;gap:0;margin:10px 0;}
+  .flow-box{padding:6px 12px;border-radius:var(--radius);font-size:12px;font-weight:500;border:1px solid;white-space:nowrap;}
+  .flow-arrow{padding:0 5px;color:var(--ink3);font-size:16px;line-height:1;}
+  .fb-api{background:var(--blue-l);color:var(--blue);border-color:#b3ceee;}
+  .fb-mod{background:var(--purple-l);color:var(--purple);border-color:#c9beed;}
+  .fb-sheet{background:var(--green-l);color:var(--green);border-color:#9ed0b3;}
+  .fb-ui{background:var(--amber-l);color:var(--amber);border-color:#f0cc88;}
+  .fb-auto{background:var(--teal-l);color:var(--teal);border-color:#8fd0d0;}
+
+  /* File tree */
+  .file-tree{font-family:var(--font-mono);font-size:12px;line-height:2;color:var(--ink2);background:#f8f8f6;border-radius:var(--radius);padding:14px 18px;margin:8px 0;}
+  .file-tree .dir{color:var(--blue);font-weight:600;}
+  .file-tree .star{color:var(--purple);font-weight:700;}
+  .file-tree .cmt{color:var(--ink3);}
+
+  /* Checklist */
+  .checklist{list-style:none;margin-top:6px;}
+  .checklist li{display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid #f4f4f2;font-size:13px;color:var(--ink2);}
+  .checklist li:last-child{border-bottom:none;}
+  .check-box{width:15px;height:15px;border:1.5px solid var(--border);border-radius:3px;flex-shrink:0;margin-top:2px;}
+
+  /* Timeline */
+  .timeline{margin:10px 0;}
+  .tl-item{display:flex;gap:12px;padding-bottom:14px;position:relative;}
+  .tl-item:not(:last-child)::before{content:'';position:absolute;left:14px;top:30px;width:1px;bottom:0;background:var(--border);}
+  .tl-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;position:relative;z-index:1;}
+  .tl-content{flex:1;}
+  .tl-title{font-size:13px;font-weight:600;margin-bottom:2px;}
+  .tl-desc{font-size:12px;color:var(--ink3);line-height:1.5;}
+
+  /* Color variants */
+  .c-must{background:var(--coral-l);color:var(--coral);border:1.5px solid #e8b0ab;}
+  .c-core{background:var(--blue-l);color:var(--blue);border:1.5px solid #a0c0e8;}
+  .c-mgmt{background:var(--amber-l);color:var(--amber);border:1.5px solid #e8c870;}
+  .c-done{background:var(--green-l);color:var(--green);border:1.5px solid #88c8a0;}
+  .c-auto{background:var(--teal-l);color:var(--teal);border:1.5px solid #70c0c0;}
+  .c-rule{background:var(--purple-l);color:var(--purple);border:1.5px solid #c9beed;}
+
+  /* Summary */
+  .summary-bar{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:24px;}
+  .summary-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;text-align:center;}
+  .summary-card .s-num{font-size:22px;font-weight:700;}
+  .summary-card .s-lbl{font-size:11px;color:var(--ink3);margin-top:2px;}
+
+  /* Polling table row highlight */
+  .row-auto td:first-child{font-weight:600;color:var(--teal);}
+
+  /* fn table */
+  .fn-table td:first-child{font-family:var(--font-mono);font-size:11px;color:var(--blue);width:42%;}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <h1>⚽ Work Plan — Website Dự đoán Bóng đá</h1>
+  <p>Cập nhật kết quả tự động · Rules tính điểm trong file JS tĩnh · Google Sheets chỉ lưu dữ liệu</p>
+  <div class="badges">
+    <span class="badge">GitHub Pages</span>
+    <span class="badge">Google Sheets DB</span>
+    <span class="badge">Google OAuth</span>
+    <span class="badge">football-data.org API</span>
+    <span class="badge">~30 người dùng</span>
+    <span class="badge">World Cup / mở rộng được</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Principles -->
+  <div class="principle-bar">
+    <div class="principle-item">
+      <div class="principle-icon">📁</div>
+      <div class="principle-text">
+        <div class="pt">Mỗi module một file JS</div>
+        <div class="ps">Dễ bảo trì, dễ mở rộng độc lập</div>
+      </div>
+    </div>
+    <div class="principle-item">
+      <div class="principle-icon">⚙️</div>
+      <div class="principle-text">
+        <div class="pt">Rules trong scoring_rules.js</div>
+        <div class="ps">Sửa → deploy ~1 phút, an toàn, dễ debug</div>
+      </div>
+    </div>
+    <div class="principle-item">
+      <div class="principle-icon">🗄️</div>
+      <div class="principle-text">
+        <div class="pt">Google Sheets chỉ lưu dữ liệu</div>
+        <div class="ps">Users, predictions, results, leaderboard</div>
+      </div>
+    </div>
+    <div class="principle-item">
+      <div class="principle-icon">🤖</div>
+      <div class="principle-text">
+        <div class="pt">Kết quả cập nhật tự động</div>
+        <div class="ps">Poll API sau kickoff, không cần admin nhập tay</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Responsibility split -->
+  <div class="phase" style="margin-bottom:24px;">
+    <div class="phase-header" onclick="toggle(this)" style="cursor:pointer;">
+      <div style="font-size:14px;font-weight:600;flex:1;">📊 Phân chia trách nhiệm lưu trữ</div>
+      <span class="chevron">›</span>
+    </div>
+    <div class="phase-body" style="display:block;">
+      <table class="resp-table">
+        <tr><th>Lưu ở đâu</th><th>Lưu gì</th><th>Ai sửa</th><th>Hiệu lực</th></tr>
+        <tr>
+          <td><code>scoring_rules.js</code></td>
+          <td>Rules tính điểm — correct_pts, wrong_pts, allow_draw theo phase</td>
+          <td>Admin GitHub</td>
+          <td>Sau deploy (~1 phút)</td>
+        </tr>
+        <tr>
+          <td><code>config.js</code></td>
+          <td>API keys, Sheet ID, LOCK_BEFORE_MIN, CACHE_TTL_MIN, giải đấu active</td>
+          <td>Admin GitHub</td>
+          <td>Sau deploy (~1 phút)</td>
+        </tr>
+        <tr>
+          <td>Google Sheets</td>
+          <td>Users · Predictions · Matches (+ kết quả auto) · Leaderboard_Cache</td>
+          <td>Hệ thống tự ghi / Admin override</td>
+          <td>Ngay lập tức</td>
+        </tr>
+        <tr>
+          <td>football-data.org API</td>
+          <td>Lịch thi đấu & kết quả thô (nguồn sự thật)</td>
+          <td>Không sửa</td>
+          <td>Real-time</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-bar">
+    <div class="summary-card"><div class="s-num" style="color:var(--blue)">8</div><div class="s-lbl">Phase</div></div>
+    <div class="summary-card"><div class="s-num" style="color:var(--purple)">8</div><div class="s-lbl">Module JS</div></div>
+    <div class="summary-card"><div class="s-num" style="color:var(--green)">4</div><div class="s-lbl">Google Sheets</div></div>
+    <div class="summary-card"><div class="s-num" style="color:var(--coral)">4</div><div class="s-lbl">Trang UI</div></div>
+    <div class="summary-card"><div class="s-num" style="color:var(--teal)">Auto</div><div class="s-lbl">Cập nhật kết quả</div></div>
+  </div>
+
+  <!-- Nav -->
+  <div class="phase-nav">
+    <a href="#p1">1. Hạ tầng & Sheets</a>
+    <a href="#p2">2. Authentication</a>
+    <a href="#p3">3. Lịch thi đấu & API</a>
+    <a href="#p4">4. Bình chọn</a>
+    <a href="#p5">5. Auto kết quả</a>
+    <a href="#p6">6. Tính điểm & BXH</a>
+    <a href="#p7">7. Admin Panel</a>
+    <a href="#p8">8. Deploy & Test</a>
+  </div>
+
+  <!-- ═══ PHASE 1 ═══ -->
+  <div class="phase open" id="p1">
+    <div class="phase-header" onclick="toggle(this)">
+      <div class="phase-num c-must">1</div>
+      <div><div class="phase-title">Hạ tầng & Google Sheets Database</div><div class="phase-sub">Cấu trúc thư mục · scoring_rules.js · 4 Sheets · Google Cloud setup</div></div>
+      <span class="phase-tag tag-must">Bắt buộc trước</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="phase-body">
+
+      <div class="section">
+        <div class="section-title">Cấu trúc thư mục</div>
+        <div class="file-tree">
+<span class="dir">football-prediction/</span>
+├── index.html               <span class="cmt">← Trang chủ: trận đấu 24h, kết quả gần đây</span>
+├── predict.html             <span class="cmt">← Giao diện bình chọn</span>
+├── leaderboard.html         <span class="cmt">← Bảng xếp hạng</span>
+├── admin.html               <span class="cmt">← Quản lý & giám sát</span>
+├── <span class="dir">js/</span>
+│   ├── config.js            <span class="cmt">← API keys, Sheet ID, hằng số chung</span>
+│   ├── <span class="star">scoring_rules.js</span>     <span class="cmt">← ★ Rules tính điểm — SỬA ĐÂY để đổi rules</span>
+│   ├── mod_auth.js          <span class="cmt">← Google login, session, phân quyền</span>
+│   ├── mod_sheets.js        <span class="cmt">← Wrapper CRUD Google Sheets API v4</span>
+│   ├── mod_api.js           <span class="cmt">← football-data.org + cache + auto-sync</span>
+│   ├── mod_matches.js       <span class="cmt">← Logic lọc & hiển thị trận đấu</span>
+│   ├── mod_predictions.js   <span class="cmt">← Bình chọn, kiểm tra khóa, ghi Sheet</span>
+│   ├── mod_scoring.js       <span class="cmt">← Tính điểm, đọc SCORING_RULES</span>
+│   └── mod_ui.js            <span class="cmt">← Helper render UI dùng chung</span>
+├── <span class="dir">css/</span>style.css
+└── <span class="dir">.github/workflows/</span>deploy.yml
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">★ scoring_rules.js — Cấu hình rules tính điểm</div>
+        <div class="star-box">
+          <div class="label">📌 Quy tắc quan trọng</div>
+          <p style="font-size:12px;color:var(--ink2);line-height:1.6;">File này là <strong>nguồn sự thật duy nhất</strong> cho rules tính điểm. <code>mod_scoring.js</code> đọc từ đây — không hardcode điểm ở bất kỳ đâu khác. Muốn đổi rules: sửa file này → commit → GitHub Actions deploy tự động (~1 phút).</p>
+        </div>
+        <div class="logic-box">// scoring_rules.js — SỬA FILE NÀY để thay đổi rules tính điểm
+
+const SCORING_RULES = {
+  GROUP: {
+    correct_pts:  0,    // đoán đúng W/D/L → không được điểm
+    wrong_pts:   -1,    // đoán sai        → trừ 1 điểm
+    allow_draw: true,   // có nút Hòa
+    note: 'Vòng bảng'
+  },
+  KNOCKOUT: {
+    correct_pts:  0,    // đoán đúng W/L   → không được điểm
+    wrong_pts:   -1,    // đoán sai        → trừ 1 điểm
+    allow_draw: false,  // không có nút Hòa
+    note: 'Loại trực tiếp'
+  }
+}</div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">4 Sheets trong Google Spreadsheet (chỉ lưu dữ liệu)</div>
+
+        <div class="sheet-name">Users</div>
+        <table><tr><th>Cột</th><th>Kiểu</th><th>Mô tả</th></tr>
+          <tr><td><code>google_id</code></td><td>string</td><td>ID từ Google OAuth — primary key</td></tr>
+          <tr><td><code>email</code></td><td>string</td><td>Email Google</td></tr>
+          <tr><td><code>name</code></td><td>string</td><td>Tên hiển thị</td></tr>
+          <tr><td><code>avatar_url</code></td><td>string</td><td>Ảnh đại diện từ Google</td></tr>
+          <tr><td><code>is_admin</code></td><td>boolean</td><td><code>TRUE</code> nếu là admin — kiểm tra server-side</td></tr>
+          <tr><td><code>joined_at</code></td><td>timestamp</td><td>Lần đăng nhập đầu tiên</td></tr>
+        </table>
+
+        <div class="sheet-name">Matches</div>
+        <table><tr><th>Cột</th><th>Kiểu</th><th>Mô tả</th></tr>
+          <tr><td><code>match_id</code></td><td>string</td><td>ID từ football-data.org</td></tr>
+          <tr><td><code>home_team</code></td><td>string</td><td>Đội nhà</td></tr>
+          <tr><td><code>away_team</code></td><td>string</td><td>Đội khách</td></tr>
+          <tr><td><code>kickoff_time</code></td><td>ISO 8601</td><td>Giờ thi đấu UTC — hiển thị GMT+7</td></tr>
+          <tr><td><code>phase</code></td><td>string</td><td><code>GROUP</code> hoặc <code>KNOCKOUT</code></td></tr>
+          <tr><td><code>competition</code></td><td>string</td><td><code>WC</code>, <code>EC</code>...</td></tr>
+          <tr><td><code>status</code></td><td>string</td><td><code>SCHEDULED</code> / <code>IN_PLAY</code> / <code>FINISHED</code></td></tr>
+          <tr><td><code>result</code></td><td>string</td><td><code>W</code> / <code>D</code> / <code>L</code> — tự động từ API</td></tr>
+          <tr><td><code>result_source</code></td><td>string</td><td><code>auto</code> hoặc <code>manual</code> — auto không ghi đè manual</td></tr>
+          <tr><td><code>result_updated_at</code></td><td>timestamp</td><td>Lần sync gần nhất</td></tr>
+        </table>
+
+        <div class="sheet-name">Predictions</div>
+        <table><tr><th>Cột</th><th>Kiểu</th><th>Mô tả</th></tr>
+          <tr><td><code>prediction_id</code></td><td>string</td><td>UUID tự sinh</td></tr>
+          <tr><td><code>user_id</code></td><td>string</td><td>google_id của người dự đoán</td></tr>
+          <tr><td><code>match_id</code></td><td>string</td><td>ID trận đấu</td></tr>
+          <tr><td><code>prediction</code></td><td>string</td><td><code>W</code> / <code>D</code> / <code>L</code></td></tr>
+          <tr><td><code>submitted_at</code></td><td>timestamp</td><td>Thời điểm submit / cập nhật</td></tr>
+        </table>
+
+        <div class="sheet-name">Leaderboard_Cache</div>
+        <table><tr><th>Cột</th><th>Kiểu</th><th>Mô tả</th></tr>
+          <tr><td><code>user_id</code></td><td>string</td><td>google_id</td></tr>
+          <tr><td><code>name</code></td><td>string</td><td>Tên hiển thị</td></tr>
+          <tr><td><code>total_score</code></td><td>number</td><td>Điểm tích lũy</td></tr>
+          <tr><td><code>correct</code></td><td>number</td><td>Số lần đoán đúng</td></tr>
+          <tr><td><code>wrong</code></td><td>number</td><td>Số lần đoán sai</td></tr>
+          <tr><td><code>pending</code></td><td>number</td><td>Số trận chờ kết quả</td></tr>
+          <tr><td><code>last_updated</code></td><td>timestamp</td><td>Lần tính điểm gần nhất</td></tr>
+        </table>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Checklist Google Cloud setup</div>
+        <ul class="checklist">
+          <li><span class="check-box"></span>Tạo Google Cloud Project mới</li>
+          <li><span class="check-box"></span>Bật Google Sheets API v4</li>
+          <li><span class="check-box"></span>Bật Google Identity Services (OAuth 2.0)</li>
+          <li><span class="check-box"></span>Tạo OAuth Client ID (Web application)</li>
+          <li><span class="check-box"></span>Thêm <code>https://&lt;username&gt;.github.io</code> vào Authorized JavaScript Origins</li>
+          <li><span class="check-box"></span>Lưu <code>CLIENT_ID</code> và <code>SPREADSHEET_ID</code> vào <code>config.js</code></li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ PHASE 2 ═══ -->
+  <div class="phase" id="p2">
+    <div class="phase-header" onclick="toggle(this)">
+      <div class="phase-num c-must">2</div>
+      <div><div class="phase-title">Authentication — mod_auth.js</div><div class="phase-sub">Google OAuth · Session localStorage · Phân quyền admin server-side</div></div>
+      <span class="phase-tag tag-must">Bắt buộc trước</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="phase-body">
+      <div class="section">
+        <div class="section-title">Luồng đăng nhập</div>
+        <div class="flow">
+          <div class="flow-box fb-ui">Nút "Đăng nhập Google"</div><div class="flow-arrow">→</div>
+          <div class="flow-box fb-api">Google GIS popup</div><div class="flow-arrow">→</div>
+          <div class="flow-box fb-mod">Verify JWT token</div><div class="flow-arrow">→</div>
+          <div class="flow-box fb-sheet">Ghi / check Sheet:Users</div><div class="flow-arrow">→</div>
+          <div class="flow-box fb-ui">Lưu session localStorage</div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Các hàm cần xây dựng</div>
+        <table class="fn-table">
+          <tr><th>Hàm</th><th>Mô tả</th></tr>
+          <tr><td><code>auth.init()</code></td><td>Khởi tạo GIS, restore session cũ từ localStorage</td></tr>
+          <tr><td><code>auth.login()</code></td><td>Mở popup đăng nhập Google, nhận id_token JWT</td></tr>
+          <tr><td><code>auth.logout()</code></td><td>Xóa session, redirect trang chủ</td></tr>
+          <tr><td><code>auth.getCurrentUser()</code></td><td>Trả về user object (google_id, name, email, is_admin)</td></tr>
+          <tr><td><code>auth.isAdmin()</code></td><td>Kiểm tra <code>is_admin</code> trong Sheet:Users — không chỉ localStorage</td></tr>
+          <tr><td><code>auth.requireLogin()</code></td><td>Guard: redirect về login nếu chưa đăng nhập</td></tr>
+          <tr><td><code>auth.getAuthHeader()</code></td><td>Trả về <code>Bearer &lt;token&gt;</code> đính vào mọi Sheets API call</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PHASE 3 ═══ -->
+  <div class="phase" id="p3">
+    <div class="phase-header" onclick="toggle(this)">
+      <div class="phase-num c-core">3</div>
+      <div><div class="phase-title">Lịch thi đấu & API — mod_api.js + mod_matches.js</div><div class="phase-sub">Cache 60 phút · Sync vào Sheet:Matches · Lọc theo màn hình · GMT+7</div></div>
+      <span class="phase-tag tag-core">Core</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="phase-body">
+      <div class="section">
+        <div class="section-title">Chiến lược cache (free tier: 10 req/phút)</div>
+        <div class="logic-box">getMatches()
+  → Cache localStorage còn hiệu lực (< 60 phút)?
+      → Dùng cache — không tốn quota
+  → Hết hạn / chưa có?
+      → Gọi football-data.org API
+      → Lưu cache + timestamp
+      → Upsert trận vào Sheet:Matches</div>
+      </div>
+      <div class="section">
+        <div class="section-title">Lọc trận theo màn hình</div>
+        <table>
+          <tr><th>Màn hình</th><th>Điều kiện lọc</th></tr>
+          <tr><td>Trang chủ</td><td>kickoff trong khoảng <code>now ± 24h</code>, hiển thị GMT+7</td></tr>
+          <tr><td>Bình chọn</td><td>Trận chưa có kết quả VÀ chưa quá giờ khóa</td></tr>
+          <tr><td>Admin</td><td>Tất cả trận, hiển thị cả UTC</td></tr>
+        </table>
+      </div>
+      <div class="section">
+        <div class="section-title">Mở rộng giải đấu trong config.js</div>
+        <div class="logic-box">const CONFIG = {
+  COMPETITIONS: {
+    WC: { code: 'WC', name: 'World Cup' },
+    EC: { code: 'EC', name: 'Euro' },   // thêm sau
+    PL: { code: 'PL', name: 'EPL'  },   // thêm sau
+  },
+  ACTIVE:          ['WC'],  // chỉ fetch giải đang hoạt động
+  LOCK_BEFORE_MIN:  60,     // khóa bình chọn trước N phút
+  CACHE_TTL_MIN:    60,     // cache API trong N phút
+  TIMEZONE: 'Asia/Ho_Chi_Minh',
+}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PHASE 4 ═══ -->
+  <div class="phase" id="p4">
+    <div class="phase-header" onclick="toggle(this)">
+      <div class="phase-num c-core">4</div>
+      <div><div class="phase-title">Giao diện Bình chọn — mod_predictions.js</div><div class="phase-sub">2 nút vs 3 nút theo phase · Khóa 1h trước kickoff · Ghi Sheet:Predictions</div></div>
+      <span class="phase-tag tag-core">Core</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="phase-body">
+      <div class="section">
+        <div class="section-title">Logic hiển thị mỗi thẻ trận</div>
+        <div class="logic-box">// Số nút lấy từ SCORING_RULES[phase].allow_draw
+if (SCORING_RULES[phase].allow_draw)
+  → 3 nút: [Thắng] [Hòa] [Thua]   ← GROUP
+else
+  → 2 nút: [Thắng] [Thua]          ← KNOCKOUT
+
+if (now >= kickoff - LOCK_BEFORE_MIN):
+  → Tất cả nút disabled
+  → Hiển thị bình chọn của user (readonly)
+  → Nhãn "Đã khóa lúc HH:MM"
+else:
+  → Nút đã chọn highlight
+  → Countdown: "Khóa sau Xh Ym"</div>
+      </div>
+      <div class="section">
+        <div class="section-title">Luồng ghi bình chọn</div>
+        <div class="flow">
+          <div class="flow-box fb-ui">Click [W/D/L]</div><div class="flow-arrow">→</div>
+          <div class="flow-box fb-mod">Double-check khóa</div><div class="flow-arrow">→</div>
+          <div class="flow-box fb-mod">Đã có prediction chưa?</div><div class="flow-arrow">→</div>
+          <div class="flow-box fb-sheet">Thêm mới / cập nhật Sheet:Predictions</div><div class="flow-arrow">→</div>
+          <div class="flow-box fb-ui">Optimistic update UI</div>
+        </div>
+        <div class="note">💡 <code>allow_draw</code> trong <code>scoring_rules.js</code> cũng điều khiển việc hiển thị nút Hòa — không cần sửa code UI khi đổi rules.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PHASE 5 ═══ -->
+  <div class="phase" id="p5">
+    <div class="phase-header" onclick="toggle(this)">
+      <div class="phase-num c-auto">5</div>
+      <div><div class="phase-title">Tự động cập nhật kết quả — mod_api.js</div><div class="phase-sub">Polling sau kickoff · Parse W/D/L · Ghi Sheet:Matches · Trigger tính điểm</div></div>
+      <span class="phase-tag tag-new">★ Tự động</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="phase-body">
+      <div class="section">
+        <div class="section-title">Lịch polling thông minh</div>
+        <table>
+          <tr><th>Thời điểm</th><th>Hành động</th><th>Interval</th></tr>
+          <tr><td>Trước kickoff</td><td>Không poll</td><td>—</td></tr>
+          <tr class="row-auto"><td>kickoff → +120 phút</td><td>Poll trận IN_PLAY</td><td>5 phút</td></tr>
+          <tr class="row-auto"><td>+120 phút (chưa FINISHED)</td><td>Hiệp phụ / penalty</td><td>10 phút</td></tr>
+          <tr><td>Sau FINISHED</td><td>Dừng poll trận đó</td><td>—</td></tr>
+          <tr><td>Không có ai online</td><td>Không poll (client-side)</td><td>—</td></tr>
+        </table>
+        <div class="note-teal">⚡ Polling là client-side — chỉ chạy khi có ít nhất 1 tab đang mở. Với free tier 10 req/phút và tối đa ~5 trận đồng thời, interval 5 phút là hoàn toàn an toàn.</div>
+      </div>
+      <div class="section">
+        <div class="section-title">Luồng auto-sync đầy đủ</div>
+        <div class="flow" style="flex-direction:column;align-items:flex-start;gap:4px;">
+          <div class="flow" style="flex-wrap:nowrap;">
+            <div class="flow-box fb-ui">Trang load</div><div class="flow-arrow">→</div>
+            <div class="flow-box fb-mod">api.startAutoSync()</div><div class="flow-arrow">→</div>
+            <div class="flow-box fb-mod">Tìm trận IN_PLAY / sắp FINISHED</div>
+          </div>
+          <div style="padding-left:20px;color:var(--ink3);font-size:13px;">↓ mỗi 5-10 phút</div>
+          <div class="flow" style="flex-wrap:nowrap;">
+            <div class="flow-box fb-api">GET /matches/{id}</div><div class="flow-arrow">→</div>
+            <div class="flow-box fb-mod">parseOutcome(score)</div><div class="flow-arrow">→</div>
+            <div class="flow-box fb-sheet">Sheet:Matches (result, result_source='auto')</div>
+          </div>
+          <div style="padding-left:20px;color:var(--ink3);font-size:13px;">↓ trigger ngay</div>
+          <div class="flow" style="flex-wrap:nowrap;">
+            <div class="flow-box fb-mod">scoring.recalculateForMatch()</div><div class="flow-arrow">→</div>
+            <div class="flow-box fb-sheet">Sheet:Leaderboard_Cache</div><div class="flow-arrow">→</div>
+            <div class="flow-box fb-ui">BXH tự refresh</div>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Parse kết quả từ API (có xử lý hiệp phụ & penalty)</div>
+        <div class="logic-box">function parseOutcome(match) {
+  const score = match.score.fullTime
+  if (score.home > score.away) return 'W'
+  if (score.home < score.away) return 'L'
+
+  // Vòng loại trực tiếp: hòa 90 phút → xem thêm giờ
+  if (match.phase === 'KNOCKOUT') {
+    const et = match.score.extraTime
+    if (et?.home > et?.away) return 'W'
+    if (et?.home < et?.away) return 'L'
+    const pen = match.score.penalties
+    return (pen?.home > pen?.away) ? 'W' : 'L'
+  }
+  return 'D'  // hòa hợp lệ ở vòng bảng
+}
+
+// Bảo vệ: chỉ ghi nếu result_source !== 'manual'
+if (existingResult?.result_source === 'manual') return  // admin đã override, bỏ qua</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PHASE 6 ═══ -->
+  <div class="phase" id="p6">
+    <div class="phase-header" onclick="toggle(this)">
+      <div class="phase-num c-core">6</div>
+      <div><div class="phase-title">Tính điểm & Bảng xếp hạng — mod_scoring.js</div><div class="phase-sub">Đọc SCORING_RULES · Tính tự động sau auto-sync · Sort tùy ý</div></div>
+      <span class="phase-tag tag-core">Core</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="phase-body">
+      <div class="section">
+        <div class="section-title">Logic tính điểm — đọc từ scoring_rules.js, không hardcode</div>
+        <div class="logic-box">// mod_scoring.js
+// Mọi rules đến từ SCORING_RULES (scoring_rules.js) — không hardcode số nào ở đây
+
+async function calculateScore(userId) {
+  const predictions = await sheets.getPredictions(userId)
+  const results     = await sheets.getResults()       // match_id → { outcome, phase }
+
+  let score = 0, correct = 0, wrong = 0, pending = 0
+
+  for (const pred of predictions) {
+    const match = results[pred.match_id]
+    if (!match?.outcome) { pending++; continue }
+
+    const rule = SCORING_RULES[match.phase]           // ← từ scoring_rules.js
+    if (pred.prediction === match.outcome) {
+      score += rule.correct_pts
+      correct++
+    } else {
+      score += rule.wrong_pts
+      wrong++
+    }
+  }
+  return { score, correct, wrong, pending }
+}</div>
+      </div>
+      <div class="section">
+        <div class="section-title">Bảng xếp hạng</div>
+        <table>
+          <tr><th>Tính năng</th><th>Mô tả</th></tr>
+          <tr><td>Sắp xếp</td><td>Toggle điểm cao→thấp / thấp→cao</td></tr>
+          <tr><td>Highlight</td><td>Row của user đang đăng nhập nổi bật</td></tr>
+          <tr><td>Cột</td><td>Hạng · Tên · Điểm · Đúng · Sai · Đang chờ</td></tr>
+          <tr><td>Cập nhật</td><td>Tự refresh sau mỗi auto-sync thành công</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PHASE 7 ═══ -->
+  <div class="phase" id="p7">
+    <div class="phase-header" onclick="toggle(this)">
+      <div class="phase-num c-mgmt">7</div>
+      <div><div class="phase-title">Admin Panel — admin.html</div><div class="phase-sub">Chỉ is_admin=TRUE · Giám sát auto-sync · Override thủ công · Recalculate</div></div>
+      <span class="phase-tag tag-mgmt">Quản lý</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="phase-body">
+      <div class="section">
+        <div class="section-title">Tính năng</div>
+        <table>
+          <tr><th>Tính năng</th><th>Mô tả</th><th>Khi nào dùng</th></tr>
+          <tr><td>Giám sát auto-sync</td><td>Trận đang poll, lần sync gần nhất, lỗi nếu có</td><td>Hàng ngày</td></tr>
+          <tr><td>Override kết quả</td><td>Nhập W/D/L thủ công, set <code>result_source='manual'</code></td><td>API sai / chậm</td></tr>
+          <tr><td>Recalculate All</td><td>Tính lại điểm toàn bộ sau khi đổi rules và deploy</td><td>Sau deploy rules mới</td></tr>
+          <tr><td>Quản lý người chơi</td><td>Danh sách user, cấp / thu hồi quyền admin</td><td>Onboarding</td></tr>
+          <tr><td>Xem bình chọn</td><td>Ai đoán gì — hiển thị sau khi trận khóa</td><td>Debug</td></tr>
+        </table>
+        <div class="note">⚠️ Khi admin override thủ công, cờ <code>result_source = 'manual'</code> đảm bảo auto-sync sẽ không ghi đè kết quả đó.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PHASE 8 ═══ -->
+  <div class="phase" id="p8">
+    <div class="phase-header" onclick="toggle(this)">
+      <div class="phase-num c-done">8</div>
+      <div><div class="phase-title">Deploy GitHub Pages & Kiểm thử</div><div class="phase-sub">GitHub Actions · Checklist go-live · Thứ tự code</div></div>
+      <span class="phase-tag tag-done">Cuối cùng</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="phase-body">
+      <div class="section">
+        <div class="section-title">GitHub Actions — deploy.yml</div>
+        <div class="logic-box">name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./</div>
+      </div>
+      <div class="section">
+        <div class="section-title">Checklist trước go-live</div>
+        <ul class="checklist">
+          <li><span class="check-box"></span>Đăng nhập Google thành công, user ghi vào Sheet:Users</li>
+          <li><span class="check-box"></span>Admin panel chặn đúng non-admin</li>
+          <li><span class="check-box"></span>GROUP hiển thị 3 nút, KNOCKOUT hiển thị 2 nút (từ <code>allow_draw</code>)</li>
+          <li><span class="check-box"></span>Khóa đúng 60 phút trước kickoff, countdown GMT+7 đúng</li>
+          <li><span class="check-box"></span>Polling tự khởi động khi có trận IN_PLAY</li>
+          <li><span class="check-box"></span>Kết quả tự ghi vào Sheet:Matches sau FINISHED</li>
+          <li><span class="check-box"></span>Override manual không bị auto-sync ghi đè</li>
+          <li><span class="check-box"></span>Điểm tính đúng theo <code>SCORING_RULES</code> trong <code>scoring_rules.js</code></li>
+          <li><span class="check-box"></span>Đổi rules → deploy → Recalculate All → điểm đúng</li>
+          <li><span class="check-box"></span>BXH tự refresh sau auto-sync</li>
+          <li><span class="check-box"></span>Không vượt quota 10 req/phút football-data.org</li>
+          <li><span class="check-box"></span>Trang load &lt; 3 giây trên mobile</li>
+        </ul>
+      </div>
+      <div class="section">
+        <div class="section-title">Thứ tự code từ đầu đến cuối</div>
+        <div class="timeline">
+          <div class="tl-item"><div class="tl-dot c-must">1</div><div class="tl-content"><div class="tl-title">config.js + scoring_rules.js + mod_sheets.js</div><div class="tl-desc">Nền tảng — mọi module khác phụ thuộc vào đây</div></div></div>
+          <div class="tl-item"><div class="tl-dot c-must">2</div><div class="tl-content"><div class="tl-title">mod_auth.js</div><div class="tl-desc">Google login — bắt buộc trước bất kỳ tính năng nào</div></div></div>
+          <div class="tl-item"><div class="tl-dot c-core">3</div><div class="tl-content"><div class="tl-title">mod_api.js (phần fetch + cache)</div><div class="tl-desc">Lấy lịch từ football-data.org, sync vào Sheet:Matches</div></div></div>
+          <div class="tl-item"><div class="tl-dot c-core">4</div><div class="tl-content"><div class="tl-title">index.html + mod_matches.js</div><div class="tl-desc">Trang chủ — trận hôm nay và kết quả gần đây</div></div></div>
+          <div class="tl-item"><div class="tl-dot c-core">5</div><div class="tl-content"><div class="tl-title">predict.html + mod_predictions.js</div><div class="tl-desc">Tính năng cốt lõi: bình chọn, khóa, ghi Sheet</div></div></div>
+          <div class="tl-item"><div class="tl-dot c-auto">6</div><div class="tl-content"><div class="tl-title">mod_api.js (phần auto-sync polling)</div><div class="tl-desc">Polling IN_PLAY, parse outcome, ghi kết quả tự động</div></div></div>
+          <div class="tl-item"><div class="tl-dot c-core">7</div><div class="tl-content"><div class="tl-title">mod_scoring.js + leaderboard.html</div><div class="tl-desc">Tính điểm từ SCORING_RULES, cache BXH, auto-refresh</div></div></div>
+          <div class="tl-item"><div class="tl-dot c-mgmt">8</div><div class="tl-content"><div class="tl-title">admin.html</div><div class="tl-desc">Override kết quả, giám sát auto-sync, quản lý user</div></div></div>
+          <div class="tl-item"><div class="tl-dot c-done">9</div><div class="tl-content"><div class="tl-title">deploy.yml + kiểm thử toàn bộ</div><div class="tl-desc">GitHub Actions, checklist, go-live</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function toggle(header) {
+    header.parentElement.classList.toggle('open');
+  }
+  document.querySelectorAll('.phase-nav a').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.querySelector(a.getAttribute('href'));
+      if (!target) return;
+      target.classList.add('open');
+      setTimeout(() => target.scrollIntoView({ behavior:'smooth', block:'start' }), 50);
+    });
+  });
+</script>
+</body>
+</html>

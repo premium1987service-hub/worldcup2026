@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Cup Challenge - Dự đoán Tỷ số Bóng đá</title>
+  <meta name="description" content="Trang web dự đoán tỷ số bóng đá World Cup - Tính điểm tự động thông qua Google Sheets và football-data.org API">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Wrapper cho Header (sẽ được mod_ui render) -->
+  <div id="header-wrapper"></div>
+
+  <main class="container">
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="hero-content">
+        <h1>DỰ ĐOÁN WORLD CUP 2026</h1>
+        <p class="hero-tagline">Thử tài dự đoán kết quả các trận đấu bóng đá kịch tính, tích lũy điểm số và cạnh tranh thứ hạng cùng bạn bè trên Bảng xếp hạng!</p>
+        
+        <!-- Thống kê tổng quan -->
+        <div class="hero-stats">
+          <div class="hero-stat-card">
+            <span class="hero-stat-value" id="stat-total-matches">-</span>
+            <span class="hero-stat-label">Trận đấu</span>
+          </div>
+          <div class="hero-stat-card">
+            <span class="hero-stat-value" id="stat-total-users">-</span>
+            <span class="hero-stat-label">Người chơi</span>
+          </div>
+          <div class="hero-stat-card">
+            <span class="hero-stat-value" id="stat-my-predictions">-</span>
+            <span class="hero-stat-label">Đã dự đoán</span>
+          </div>
+          <div class="hero-stat-card">
+            <span class="hero-stat-value" id="stat-my-score">-</span>
+            <span class="hero-stat-label">Điểm của tôi</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trận đấu diễn ra trong 24h -->
+    <section class="home-matches-section">
+      <div class="section-header-row">
+        <h2 class="section-title">Trận đấu nổi bật (±24h)</h2>
+        <a href="predict.html" class="view-all-link">
+          Tất cả trận đấu 
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </a>
+      </div>
+
+      <!-- Grid chứa danh sách trận đấu -->
+      <div class="matches-grid" id="home-matches-list">
+        <div class="spinner-container">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trận đấu đã kết thúc -->
+    <section class="completed-matches-section" style="margin-top: 40px;">
+      <div class="section-header-row">
+        <h2 class="section-title">Trận đấu đã kết thúc</h2>
+      </div>
+
+      <!-- Grid chứa danh sách trận đấu đã kết thúc -->
+      <div class="matches-grid" id="completed-matches-list">
+        <div class="spinner-container">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Hướng dẫn thiết lập API (Ẩn nếu đang dùng API thật) -->
+    <section class="admin-card" style="margin-top: 40px;" id="api-setup-guide">
+      <h3 style="color: var(--primary); display: flex; align-items: center; gap: 8px;">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="16" x2="12" y2="12" />
+          <line x1="12" y1="8" x2="12.01" y2="8" />
+        </svg>
+        Hướng dẫn tích hợp Google Sheets & API thực tế
+      </h3>
+      <p style="font-size: 0.85rem; color: var(--text-medium); margin-bottom: 12px;">Bạn đang chạy chế độ giả lập (Demo Mode). Để kết nối cơ sở dữ liệu thật của riêng bạn, vui lòng thực hiện các bước sau:</p>
+      <ol style="font-size: 0.85rem; color: var(--text-medium); margin-left: 20px; display: flex; flex-direction: column; gap: 6px;">
+        <li>Tạo 1 Google Spreadsheet chứa 4 sheet con đặt tên chính xác là: <code>Users</code>, <code>Matches</code>, <code>Predictions</code>, <code>Leaderboard_Cache</code>.</li>
+        <li>Tạo Google Cloud Project, bật <b>Google Sheets API v4</b> và cấu hình OAuth Client ID (loại Web Application).</li>
+        <li>Mở file <a href="file:///C:/Users/Admin/worldcup/js/config.js">js/config.js</a> và điền các tham số: <code>SPREADSHEET_ID</code>, <code>GOOGLE_CLIENT_ID</code>.</li>
+        <li>(Tùy chọn) Điền token từ <i>football-data.org</i> vào <code>FOOTBALL_API_TOKEN</code> để lấy lịch thi đấu thật.</li>
+      </ol>
+    </section>
+  </main>
+
+  <!-- Wrapper cho Footer (sẽ được mod_ui render) -->
+  <div id="footer-wrapper"></div>
+
+  <!-- Scripts stack -->
+  <script src="js/config.js"></script>
+  <script src="js/scoring_rules.js"></script>
+  <script src="js/mod_auth.js"></script>
+  <script src="js/wc2026_fixtures.js"></script>
+  <script src="js/mod_sheets.js"></script>
+  <script src="js/mod_api.js"></script>
+  <script src="js/mod_matches.js"></script>
+  <script src="js/mod_predictions.js"></script>
+  <script src="js/mod_scoring.js"></script>
+  <script src="js/mod_ui.js"></script>
+
+  <!-- Script trang chủ -->
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Khởi tạo các module nền tảng
+      await auth.init();
+      ui.initPage();
+
+      // Hiển thị hay ẩn chỉ dẫn API dựa vào cấu hình
+      const guideSection = document.getElementById('api-setup-guide');
+      if (guideSection && !CONFIG.USE_MOCK_DATA) {
+        guideSection.style.display = 'none';
+      }
+
+      // Tải dữ liệu và cập nhật giao diện
+      loadDashboardData();
+
+      // Lắng nghe sự kiện đồng bộ từ API hoặc cập nhật bình chọn để tải lại dữ liệu dashboard
+      window.addEventListener('football_data_synced', loadDashboardData);
+      window.addEventListener('prediction_updated', loadDashboardData);
+      window.addEventListener('leaderboard_recalculated', loadDashboardData);
+      
+      // Bật chế độ tự động đồng bộ kết quả (nếu có trận đang đá)
+      api.startAutoSync();
+    });
+
+    async function loadDashboardData() {
+      try {
+        const user = auth.getCurrentUser();
+        
+        // 1. Tải các nguồn dữ liệu đồng thời để tối ưu hóa hiệu năng
+        const [allMatches, allUsers, allPreds, cacheList] = await Promise.all([
+          api.getMatches(),
+          sheets.getUsers(),
+          sheets.getPredictions(),
+          sheets.getLeaderboardCache()
+        ]);
+
+        // 2. Điền số liệu tổng quan
+        document.getElementById('stat-total-matches').textContent = allMatches.length;
+        document.getElementById('stat-total-users').textContent = allUsers.length;
+
+        if (user) {
+          const myPreds = allPreds.filter(p => p.user_id === user.google_id);
+          document.getElementById('stat-my-predictions').textContent = myPreds.length;
+
+          const myCache = cacheList.find(c => c.user_id === user.google_id);
+          document.getElementById('stat-my-score').textContent = myCache ? `${myCache.total_score}đ` : '0đ';
+        } else {
+          document.getElementById('stat-my-predictions').textContent = '0';
+          document.getElementById('stat-my-score').textContent = '0đ';
+        }
+
+        // 3. Lọc và render danh sách trận đấu nổi bật (trong vòng 24h xung quanh thời điểm hiện tại)
+        const recentMatches = matches.getHomeMatches(allMatches);
+        const matchesContainer = document.getElementById('home-matches-list');
+
+        let myPredsMap = {};
+        if (user) {
+          const userPreds = allPreds.filter(p => p.user_id === user.google_id);
+          myPredsMap = userPreds.reduce((acc, p) => {
+            acc[p.match_id] = p.prediction;
+            return acc;
+          }, {});
+        }
+
+        if (recentMatches.length === 0) {
+          matchesContainer.innerHTML = `
+            <div class="empty-state" style="grid-column: 1 / -1;">
+              <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:12px; opacity:0.6;">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+              <p>Hiện không có trận đấu nào diễn ra trong vòng 24h.</p>
+              <p style="font-size:0.8rem; margin-top:4px;">Nhấp vào "Tất cả trận đấu" ở trên để xem thêm.</p>
+            </div>
+          `;
+        } else {
+          let html = '';
+          recentMatches.forEach(m => {
+            const isLocked = matches.isLocked(m);
+            const userPred = myPredsMap[m.match_id] || '';
+            
+            let statusText = 'Sắp đá';
+            let statusClass = 'status-scheduled';
+            if (m.status === 'IN_PLAY') {
+              statusText = 'Trực tiếp';
+              statusClass = 'status-in-play';
+            } else if (m.status === 'FINISHED') {
+              statusText = 'Đã kết thúc';
+              statusClass = 'status-finished';
+            }
+
+            let scoreDisplay = 'vs';
+            if (m.status === 'IN_PLAY' || m.status === 'FINISHED') {
+              const hScore = (m.home_score !== undefined && m.home_score !== null && m.home_score !== '' && String(m.home_score) !== 'undefined') ? m.home_score : '0';
+              const aScore = (m.away_score !== undefined && m.away_score !== null && m.away_score !== '' && String(m.away_score) !== 'undefined') ? m.away_score : '0';
+              scoreDisplay = `${hScore} - ${aScore}`;
+            }
+
+            let predictionResultHTML = '';
+            if (userPred) {
+              let predLabel = 'Hòa';
+              if (userPred === 'W') predLabel = 'Thắng';
+              if (userPred === 'L') predLabel = 'Thua';
+
+              let resultClass = '';
+              if (m.status === 'FINISHED' && m.result) {
+                resultClass = (userPred === m.result) ? 'pred-correct' : 'pred-wrong';
+              }
+
+              predictionResultHTML = `
+                <div class="match-user-prediction">
+                  <span class="user-pred-title">Bạn đoán:</span>
+                  <span class="user-pred-value pred-badge ${resultClass}">${predLabel} ${m.status === 'FINISHED' ? (userPred === m.result ? '✓' : '✗') : ''}</span>
+                </div>
+              `;
+            } else {
+              predictionResultHTML = `
+                <div class="match-user-prediction">
+                  <span class="user-pred-title">Chưa bình chọn</span>
+                  <span class="user-pred-value" style="color:var(--text-muted); font-size:0.8rem;">
+                    ${isLocked ? 'Đã khóa' : '<a href="predict.html" style="color:var(--primary); text-decoration:none;">Bình chọn ngay →</a>'}
+                  </span>
+                </div>
+              `;
+            }
+
+            const countdownText = matches.getLockCountdown(m);
+
+            html += `
+              <div class="match-card">
+                <div class="match-meta">
+                  <span class="match-phase">${m.phase === 'GROUP' ? 'Vòng bảng' : 'Loại trực tiếp'}</span>
+                  <span class="match-countdown ${isLocked ? 'locked' : ''}">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    ${countdownText}
+                  </span>
+                </div>
+                
+                <div class="match-teams-row">
+                  <div class="team-box">
+                    ${ui.renderFlag(m.home_team)}
+                    <span class="team-name" title="${m.home_team}">${m.home_team}</span>
+                  </div>
+                  
+                  <div class="match-score-vs">
+                    <span class="match-status-badge ${statusClass}">${statusText}</span>
+                    <span class="match-live-score" style="font-size:1.1rem; color:var(--text-medium); margin-top:8px;">${scoreDisplay}</span>
+                  </div>
+                  
+                  <div class="team-box">
+                    ${ui.renderFlag(m.away_team)}
+                    <span class="team-name" title="${m.away_team}">${m.away_team}</span>
+                  </div>
+                </div>
+
+                <div style="font-size: 0.75rem; text-align:center; color: var(--text-muted);">
+                  Thi đấu: ${matches.formatKickoffShort(m.kickoff_time)}
+                </div>
+
+                ${predictionResultHTML}
+              </div>
+            `;
+          });
+          matchesContainer.innerHTML = html;
+        }
+
+        // 4. Lọc và render danh sách trận đấu đã kết thúc
+        const completedMatches = allMatches.filter(m => m.status === 'FINISHED');
+        const completedContainer = document.getElementById('completed-matches-list');
+
+        if (completedMatches.length === 0) {
+          completedContainer.innerHTML = `
+            <div class="empty-state" style="grid-column: 1 / -1;">
+              <p>Chưa có trận đấu nào kết thúc.</p>
+            </div>
+          `;
+        } else {
+          completedMatches.sort((a, b) => new Date(b.kickoff_time) - new Date(a.kickoff_time));
+
+          let completedHtml = '';
+          completedMatches.forEach(m => {
+            const userPred = myPredsMap[m.match_id] || '';
+            
+            // Việt hóa nhãn kết quả
+            let outcomeText = 'Hòa';
+            if (m.result === 'W') outcomeText = `Thắng: ${m.home_team}`;
+            if (m.result === 'L') outcomeText = `Thắng: ${m.away_team}`;
+
+            let predictionResultHTML = '';
+            if (userPred) {
+              let predLabel = 'Hòa';
+              if (userPred === 'W') predLabel = 'Thắng';
+              if (userPred === 'L') predLabel = 'Thua';
+
+              let resultClass = (userPred === m.result) ? 'pred-correct' : 'pred-wrong';
+
+              predictionResultHTML = `
+                <div class="match-user-prediction">
+                  <span class="user-pred-title">Bạn đã đoán:</span>
+                  <span class="user-pred-value pred-badge ${resultClass}">${predLabel} ${userPred === m.result ? '✓' : '✗'}</span>
+                </div>
+              `;
+            } else {
+              predictionResultHTML = `
+                <div class="match-user-prediction">
+                  <span class="user-pred-title">Bạn đã đoán:</span>
+                  <span class="user-pred-value" style="color:var(--text-muted); font-size:0.8rem;">Không tham gia</span>
+                </div>
+              `;
+            }
+
+            const hScore = (m.home_score !== undefined && m.home_score !== null && m.home_score !== '' && String(m.home_score) !== 'undefined') ? m.home_score : '0';
+            const aScore = (m.away_score !== undefined && m.away_score !== null && m.away_score !== '' && String(m.away_score) !== 'undefined') ? m.away_score : '0';
+
+            completedHtml += `
+              <div class="match-card">
+                <div class="match-meta">
+                  <span class="match-phase">${m.phase === 'GROUP' ? 'Vòng bảng' : 'Loại trực tiếp'}</span>
+                  <span class="match-countdown locked">Đã kết thúc</span>
+                </div>
+                
+                <div class="match-teams-row">
+                  <div class="team-box">
+                    ${ui.renderFlag(m.home_team)}
+                    <span class="team-name" title="${m.home_team}">${m.home_team}</span>
+                  </div>
+                  
+                  <div class="match-score-vs">
+                    <span class="match-status-badge status-finished">FINISHED</span>
+                    <span class="match-live-score" style="font-size:1.6rem; color:var(--primary); margin-top:8px;">${hScore} - ${aScore}</span>
+                  </div>
+                  
+                  <div class="team-box">
+                    ${ui.renderFlag(m.away_team)}
+                    <span class="team-name" title="${m.away_team}">${m.away_team}</span>
+                  </div>
+                </div>
+
+                <div style="font-size: 0.75rem; text-align:center; color: var(--text-muted); margin-bottom:8px;">
+                  Kết quả: <b>${outcomeText}</b> (Đá ngày ${matches.formatKickoffShort(m.kickoff_time)})
+                </div>
+
+                ${predictionResultHTML}
+              </div>
+            `;
+          });
+          completedContainer.innerHTML = completedHtml;
+        }
+
+      } catch (e) {
+        console.error('Lỗi khi loadDashboardData:', e);
+        document.getElementById('home-matches-list').innerHTML = `
+          <div class="empty-state" style="grid-column: 1 / -1; color: #ef4444;">
+            <p>Đã xảy ra lỗi khi tải dữ liệu. Vui lòng kiểm tra console hoặc file cấu hình.</p>
+          </div>
+        `;
+      }
+    }
+  </script>
+</body>
+</html>

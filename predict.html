@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bình chọn Dự đoán - World Cup Challenge</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Wrapper cho Header (sẽ được mod_ui render) -->
+  <div id="header-wrapper"></div>
+
+  <main class="container">
+    <section>
+      <div class="section-header-row">
+        <h2 class="section-title">Bình chọn Dự đoán</h2>
+        <span id="predict-user-alert" style="color: var(--accent); font-size: 0.85rem; font-weight: 600;"></span>
+      </div>
+
+      <!-- Thanh bộ lọc -->
+      <div class="filter-bar">
+        <div class="filter-buttons">
+          <button class="filter-btn active" data-filter="all">Tất cả</button>
+          <button class="filter-btn" data-filter="GROUP">Vòng bảng</button>
+          <button class="filter-btn" data-filter="KNOCKOUT">Loại trực tiếp</button>
+          <button class="filter-btn" data-filter="voted">Đã dự đoán</button>
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-muted);">
+          * Đóng bình chọn <b>60 phút</b> trước giờ lăn bóng.
+        </div>
+      </div>
+
+      </div>
+
+      <!-- Thanh thông báo lưu thay đổi (Chỉ hiện khi có thay đổi chưa lưu) -->
+      <div id="submit-bar" class="admin-card" style="display:none; margin-bottom: 20px; border-color: var(--accent); background: rgba(255, 75, 43, 0.05); padding: 16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <span style="font-weight:700; color:var(--accent); font-size:1rem; display:block; margin-bottom:4px;">Bạn có thay đổi dự đoán chưa lưu!</span>
+            <span style="font-size:0.85rem; color:var(--text-medium);" id="submit-bar-text">Thay đổi sẽ chỉ có hiệu lực sau khi bấm Lưu.</span>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="filter-btn" style="border-color:var(--text-muted); color:var(--text-medium); padding: 6px 12px;" onclick="discardPendingChanges()">Hủy bỏ</button>
+            <button class="admin-action-btn" style="background:var(--accent); color:#fff; border:none; padding:8px 20px;" onclick="submitAllPredictions()">Lưu tất cả dự đoán (Submit)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Danh sách trận đấu bình chọn -->
+      <div class="matches-grid" id="predict-matches-list">
+        <div class="spinner-container">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Wrapper cho Footer (sẽ được mod_ui render) -->
+  <div id="footer-wrapper"></div>
+
+  <!-- Scripts stack -->
+  <script src="js/config.js"></script>
+  <script src="js/scoring_rules.js"></script>
+  <script src="js/mod_auth.js"></script>
+  <script src="js/wc2026_fixtures.js"></script>
+  <script src="js/mod_sheets.js"></script>
+  <script src="js/mod_api.js"></script>
+  <script src="js/mod_matches.js"></script>
+  <script src="js/mod_predictions.js"></script>
+  <script src="js/mod_scoring.js"></script>
+  <script src="js/mod_ui.js"></script>
+
+  <!-- Script trang bình chọn -->
+  <script>
+    let currentFilter = 'all';
+    let localMatches = [];
+    let localMyPredictions = [];
+    let originalPredictions = {};
+    let pendingPredictions = {};
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await auth.init();
+      ui.initPage();
+
+      const user = auth.getCurrentUser();
+      const alertZone = document.getElementById('predict-user-alert');
+      if (!user) {
+        alertZone.textContent = '⚠️ Đăng nhập để thực hiện bình chọn!';
+      }
+
+      // Xử lý nút bộ lọc
+      const filterBtns = document.querySelectorAll('.filter-btn');
+      filterBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          filterBtns.forEach(b => b.classList.remove('active'));
+          e.target.classList.add('active');
+          currentFilter = e.target.dataset.filter;
+          renderMatches();
+        });
+      });
+
+      // Tải và vẽ danh sách
+      await loadData();
+
+      // Đăng ký sự kiện
+      window.addEventListener('football_data_synced', loadData);
+      window.addEventListener('prediction_updated', async (e) => {
+        // Tải lại dự đoán từ database để đảm bảo khớp dữ liệu
+        await loadData();
+      });
+
+      // Bật sync kết quả tự động ở nền
+      api.startAutoSync();
+    });
+
+    async function loadData() {
+      try {
+        const user = auth.getCurrentUser();
+        const allMatches = await api.getMatches();
+        
+        // Lọc các trận đấu cho trang bình chọn (chưa kết thúc hoặc sắp diễn ra)
+        localMatches = matches.getPredictableMatches(allMatches);
+
+        if (user) {
+          localMyPredictions = await predictions.getMyPredictions();
+          originalPredictions = {};
+          pendingPredictions = {};
+          localMyPredictions.forEach(p => {
+            originalPredictions[p.match_id] = p.prediction;
+            pendingPredictions[p.match_id] = p.prediction;
+          });
+        } else {
+          localMyPredictions = [];
+          originalPredictions = {};
+          pendingPredictions = {};
+        }
+
+        renderMatches();
+        checkUnsavedChanges();
+      } catch (e) {
+        console.error('Lỗi khi tải dữ liệu bình chọn:', e);
+        document.getElementById('predict-matches-list').innerHTML = `
+          <div class="empty-state" style="grid-column: 1 / -1; color: #ef4444;">
+            <p>Đã xảy ra lỗi khi tải danh sách trận đấu.</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderMatches() {
+      const container = document.getElementById('predict-matches-list');
+      const user = auth.getCurrentUser();
+
+      // Áp dụng bộ lọc
+      let filtered = [...localMatches];
+      
+      if (currentFilter === 'GROUP') {
+        filtered = filtered.filter(m => m.phase === 'GROUP');
+      } else if (currentFilter === 'KNOCKOUT') {
+        filtered = filtered.filter(m => m.phase === 'KNOCKOUT');
+      } else if (currentFilter === 'voted') {
+        const votedMatchIds = localMyPredictions.map(p => p.match_id);
+        filtered = filtered.filter(m => votedMatchIds.includes(m.match_id));
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state" style="grid-column: 1 / -1;">
+            <p>Không tìm thấy trận đấu nào phù hợp với bộ lọc.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Map dự đoán của user từ local pending state để vẽ giao diện chọn
+      let html = '';
+      filtered.forEach(m => {
+        const isLocked = matches.isLocked(m);
+        const myChoice = pendingPredictions[m.match_id] || '';
+        const countdownText = matches.getLockCountdown(m);
+        const rules = SCORING_RULES[m.phase] || SCORING_RULES.GROUP;
+
+        let statusText = 'Sắp đá';
+        let statusClass = 'status-scheduled';
+        if (m.status === 'IN_PLAY') {
+          statusText = 'Trực tiếp';
+          statusClass = 'status-in-play';
+        }
+
+        html += `
+          <div class="match-card">
+            <div class="match-meta">
+              <span class="match-phase">${m.phase === 'GROUP' ? 'Vòng bảng' : 'Loại trực tiếp'}</span>
+              <span class="match-countdown ${isLocked ? 'locked' : ''}">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                ${countdownText}
+              </span>
+            </div>
+
+            <div class="match-teams-row">
+              <div class="team-box">
+                ${ui.renderFlag(m.home_team)}
+                <span class="team-name" title="${m.home_team}">${m.home_team}</span>
+              </div>
+              
+              <div class="match-score-vs">
+                <span class="match-status-badge ${statusClass}">${statusText}</span>
+                ${m.status === 'IN_PLAY' ? (() => {
+                  const hScore = (m.home_score !== undefined && m.home_score !== null && m.home_score !== '' && String(m.home_score) !== 'undefined') ? m.home_score : '0';
+                  const aScore = (m.away_score !== undefined && m.away_score !== null && m.away_score !== '' && String(m.away_score) !== 'undefined') ? m.away_score : '0';
+                  return `<span class="match-live-score" style="font-size:1.4rem; color:var(--primary); margin-top:8px;">${hScore} - ${aScore}</span>`;
+                })() : `
+                  <span style="font-size:0.75rem; font-weight:800; color:var(--text-muted); margin-top:8px;">VS</span>
+                `}
+              </div>
+              
+              <div class="team-box">
+                ${ui.renderFlag(m.away_team)}
+                <span class="team-name" title="${m.away_team}">${m.away_team}</span>
+              </div>
+            </div>
+
+            <div style="font-size:0.75rem; text-align:center; color:var(--text-muted); margin-bottom:16px;">
+              Giờ đá: ${matches.formatKickoffShort(m.kickoff_time)}
+            </div>
+
+            <!-- Giao diện nút bình chọn -->
+            <div class="predict-actions-wrapper">
+              <div style="font-size:0.8rem; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-align:center;">
+                Dự đoán đội thắng cuộc:
+              </div>
+              <div class="predict-actions">
+                <button class="predict-btn ${myChoice === 'W' ? 'active' : ''}" 
+                        ${(!user || isLocked) ? 'disabled' : ''} 
+                        onclick="handleVote('${m.match_id}', 'W')">
+                  <span>${m.home_team}</span>
+                  <span class="btn-sub-label">Chủ nhà</span>
+                </button>
+                
+                ${rules.allow_draw ? `
+                  <button class="predict-btn ${myChoice === 'D' ? 'active' : ''}" 
+                          ${(!user || isLocked) ? 'disabled' : ''} 
+                          onclick="handleVote('${m.match_id}', 'D')">
+                    <span>Hòa</span>
+                    <span class="btn-sub-label">Vòng bảng</span>
+                  </button>
+                ` : ''}
+
+                <button class="predict-btn ${myChoice === 'L' ? 'active' : ''}" 
+                        ${(!user || isLocked) ? 'disabled' : ''} 
+                        onclick="handleVote('${m.match_id}', 'L')">
+                  <span>${m.away_team}</span>
+                  <span class="btn-sub-label">Khách</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // Kiểm tra và hiển thị thanh submit-bar nếu có thay đổi chưa lưu
+    function checkUnsavedChanges() {
+      const bar = document.getElementById('submit-bar');
+      if (!bar) return;
+
+      let hasChanges = false;
+      let changeCount = 0;
+
+      // Các trận đấu đã chọn khác đi
+      for (const [mId, pred] of Object.entries(pendingPredictions)) {
+        if (originalPredictions[mId] !== pred) {
+          hasChanges = true;
+          changeCount++;
+        }
+      }
+
+      // Các trận đấu đã bị xóa bình chọn
+      for (const mId of Object.keys(originalPredictions)) {
+        if (!pendingPredictions[mId]) {
+          hasChanges = true;
+          changeCount++;
+        }
+      }
+
+      if (hasChanges) {
+        bar.style.display = 'block';
+        document.getElementById('submit-bar-text').textContent = `Bạn đã thay đổi dự đoán cho ${changeCount} trận đấu. Nhấp nút Lưu bên dưới để cập nhật lên hệ thống.`;
+      } else {
+        bar.style.display = 'none';
+      }
+    }
+
+    // Hủy bỏ tất cả thay đổi chưa lưu trên giao diện
+    function discardPendingChanges() {
+      pendingPredictions = { ...originalPredictions };
+      renderMatches();
+      checkUnsavedChanges();
+      ui.showToast('Đã hủy các thay đổi chưa lưu!', 'success');
+    }
+
+    // Gửi toàn bộ bình chọn lên database
+    async function submitAllPredictions() {
+      const user = auth.getCurrentUser();
+      if (!user) {
+        ui.showToast('Vui lòng đăng nhập để lưu bình chọn!', 'error');
+        return;
+      }
+
+      // Tìm danh sách thực tế cần cập nhật
+      const changesToSave = {};
+      
+      // Tìm các dự đoán mới hoặc thay đổi
+      for (const [mId, pred] of Object.entries(pendingPredictions)) {
+        if (originalPredictions[mId] !== pred) {
+          changesToSave[mId] = pred;
+        }
+      }
+      
+      // Tìm các dự đoán đã bị xóa
+      for (const mId of Object.keys(originalPredictions)) {
+        if (!pendingPredictions[mId]) {
+          changesToSave[mId] = ''; // Gửi chuỗi rỗng để xóa/hủy dự đoán
+        }
+      }
+
+      if (Object.keys(changesToSave).length === 0) {
+        ui.showToast('Không có thay đổi nào để lưu!', 'success');
+        return;
+      }
+
+      ui.showToast('Đang lưu các dự đoán của bạn...', 'success');
+
+      const ok = await predictions.submitBatch(changesToSave);
+      if (ok) {
+        ui.showToast('Lưu tất cả dự đoán thành công!', 'success');
+        await loadData();
+      } else {
+        ui.showToast('Lỗi khi lưu bình chọn. Vui lòng thử lại.', 'error');
+      }
+    }
+
+    // Hàm gọi khi bấm nút bình chọn (chỉ cập nhật tạm thời trên UI)
+    function handleVote(matchId, val) {
+      const user = auth.getCurrentUser();
+      if (!user) {
+        ui.showToast('Vui lòng đăng nhập bằng tài khoản Google để bình chọn!', 'error');
+        return;
+      }
+
+      const match = localMatches.find(m => m.match_id === matchId);
+      if (match && matches.isLocked(match)) {
+        ui.showToast('Trận đấu này đã bị khóa bình chọn!', 'error');
+        return;
+      }
+
+      if (pendingPredictions[matchId] === val) {
+        // Hủy chọn nếu click lại nút cũ
+        delete pendingPredictions[matchId];
+      } else {
+        pendingPredictions[matchId] = val;
+      }
+
+      renderMatches();
+      checkUnsavedChanges();
+    }
+  </script>
+</body>
+</html>
