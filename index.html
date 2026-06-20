@@ -255,7 +255,7 @@
                 <div class="match-teams-row">
                   <div class="team-box">
                     ${ui.renderFlag(m.home_team)}
-                    <span class="team-name" title="${m.home_team}">${m.home_team}</span>
+                    <span class="team-name" title="${ui.escapeHTML(m.home_team)}">${ui.escapeHTML(m.home_team)}</span>
                   </div>
                   
                   <div class="match-score-vs">
@@ -265,7 +265,7 @@
                   
                   <div class="team-box">
                     ${ui.renderFlag(m.away_team)}
-                    <span class="team-name" title="${m.away_team}">${m.away_team}</span>
+                    <span class="team-name" title="${ui.escapeHTML(m.away_team)}">${ui.escapeHTML(m.away_team)}</span>
                   </div>
                 </div>
 
@@ -299,8 +299,8 @@
             
             // Việt hóa nhãn kết quả
             let outcomeText = 'Hòa';
-            if (m.result === 'W') outcomeText = `Thắng: ${m.home_team}`;
-            if (m.result === 'L') outcomeText = `Thắng: ${m.away_team}`;
+            if (m.result === 'W') outcomeText = `Thắng: ${ui.escapeHTML(m.home_team)}`;
+            if (m.result === 'L') outcomeText = `Thắng: ${ui.escapeHTML(m.away_team)}`;
 
             let predictionResultHTML = '';
             if (userPred) {
@@ -338,17 +338,17 @@
                 <div class="match-teams-row">
                   <div class="team-box">
                     ${ui.renderFlag(m.home_team)}
-                    <span class="team-name" title="${m.home_team}">${m.home_team}</span>
+                    <span class="team-name" title="${ui.escapeHTML(m.home_team)}">${ui.escapeHTML(m.home_team)}</span>
                   </div>
                   
                   <div class="match-score-vs">
-                    <span class="match-status-badge status-finished">FINISHED</span>
+                    <span class="match-status-badge status-finished">Đã kết thúc</span>
                     <span class="match-live-score" style="font-size:1.6rem; color:var(--primary); margin-top:8px;">${hScore} - ${aScore}</span>
                   </div>
                   
                   <div class="team-box">
                     ${ui.renderFlag(m.away_team)}
-                    <span class="team-name" title="${m.away_team}">${m.away_team}</span>
+                    <span class="team-name" title="${ui.escapeHTML(m.away_team)}">${ui.escapeHTML(m.away_team)}</span>
                   </div>
                 </div>
 

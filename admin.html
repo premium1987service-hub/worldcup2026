@@ -229,7 +229,7 @@
     function logConsole(message) {
       const consoleBox = document.getElementById('console-logs');
       const time = new Date().toLocaleTimeString('vi-VN');
-      consoleBox.insertAdjacentHTML('beforeend', `<div class="simulation-log-item">[${time}] ${message}</div>`);
+      consoleBox.insertAdjacentHTML('beforeend', `<div class="simulation-log-item">[${time}] ${ui.escapeHTML(message)}</div>`);
       consoleBox.scrollTop = consoleBox.scrollHeight;
     }
 
@@ -262,6 +262,10 @@
       sorted.forEach(m => {
         const isLocked = matches.isLocked(m);
         const rules = SCORING_RULES[m.phase] || SCORING_RULES.GROUP;
+        const safeMatchId = ui.escapeHTML(m.match_id);
+        const safeHomeTeam = ui.escapeHTML(m.home_team);
+        const safeAwayTeam = ui.escapeHTML(m.away_team);
+        const safeCompetition = ui.escapeHTML(m.competition);
 
         let statusBadge = '';
         if (m.status === 'SCHEDULED') {
@@ -276,11 +280,11 @@
         const resultOptions = `
           <div style="display:flex; flex-direction:column; align-items:center; gap:4px; margin: 0 auto; max-width: 120px;">
             <div style="display:flex; align-items:center; gap:4px;">
-              <input type="number" min="0" id="score-home-${m.match_id}" class="admin-select" value="${m.home_score !== undefined ? m.home_score : ''}" placeholder="-" style="width:40px; text-align:center; padding:2px; font-size:0.8rem;">
+              <input type="number" min="0" id="score-home-${safeMatchId}" class="admin-select" value="${ui.escapeHTML(m.home_score !== undefined ? m.home_score : '')}" placeholder="-" style="width:40px; text-align:center; padding:2px; font-size:0.8rem;">
               <span style="font-size:0.8rem;">-</span>
-              <input type="number" min="0" id="score-away-${m.match_id}" class="admin-select" value="${m.away_score !== undefined ? m.away_score : ''}" placeholder="-" style="width:40px; text-align:center; padding:2px; font-size:0.8rem;">
+              <input type="number" min="0" id="score-away-${safeMatchId}" class="admin-select" value="${ui.escapeHTML(m.away_score !== undefined ? m.away_score : '')}" placeholder="-" style="width:40px; text-align:center; padding:2px; font-size:0.8rem;">
             </div>
-            <button class="filter-btn" style="padding:2px 6px; font-size:0.65rem; margin-top:2px; width:100%;" onclick="saveOverrideScore('${m.match_id}')">Lưu</button>
+            <button class="filter-btn" style="padding:2px 6px; font-size:0.65rem; margin-top:2px; width:100%;" onclick="saveOverrideScore('${safeMatchId}')">Lưu</button>
           </div>
         `;
 
@@ -290,12 +294,12 @@
         html += `
           <tr>
             <td>
-              <div style="font-weight:700;">${m.home_team} vs ${m.away_team}</div>
+              <div style="font-weight:700;">${safeHomeTeam} vs ${safeAwayTeam}</div>
               <div style="font-size:0.75rem; color:var(--text-muted);">${matches.formatKickoffTime(m.kickoff_time)}</div>
             </td>
             <td>
               <div>${m.phase === 'GROUP' ? 'Vòng bảng' : 'Loại trực tiếp'}</div>
-              <span style="font-size:0.7rem; color:var(--text-muted);">${m.competition}</span>
+              <span style="font-size:0.7rem; color:var(--text-muted);">${safeCompetition}</span>
             </td>
             <td>${statusBadge}</td>
             <td style="text-align:center;">
@@ -303,7 +307,7 @@
               ${m.result ? sourceBadge : ''}
             </td>
             <td style="text-align:center;">
-              <button class="filter-btn" style="padding:4px 10px; font-size:0.75rem;" onclick="viewPredictionsForMatch('${m.match_id}')">
+              <button class="filter-btn" style="padding:4px 10px; font-size:0.75rem;" onclick="viewPredictionsForMatch('${safeMatchId}')">
                 Xem bình chọn
               </button>
             </td>
@@ -331,11 +335,11 @@
           <tr>
             <td>
               <div class="leaderboard-user">
-                <img src="${avatarUrl}" alt="avatar" class="leaderboard-avatar" style="width:28px; height:28px;">
-                <span class="leaderboard-name" style="font-size:0.9rem;">${u.name}</span>
+                <img src="${ui.escapeHTML(avatarUrl)}" alt="avatar" class="leaderboard-avatar" style="width:28px; height:28px;">
+                <span class="leaderboard-name" style="font-size:0.9rem;">${ui.escapeHTML(u.name)}</span>
               </div>
             </td>
-            <td style="font-size:0.85rem; color:var(--text-medium);">${u.email}</td>
+            <td style="font-size:0.85rem; color:var(--text-medium);">${ui.escapeHTML(u.email)}</td>
             <td style="font-size:0.85rem; color:var(--text-muted);">${joinDate}</td>
             <td style="text-align:center;">
               ${u.google_id === 'mock_admin_1' ? `
@@ -363,7 +367,7 @@
       const title = document.getElementById('pred-match-title');
       const tbody = document.getElementById('match-pred-rows');
 
-      title.innerHTML = `Chi tiết Bình chọn trận: <span style="color:var(--primary);">${match.home_team} vs ${match.away_team}</span>`;
+      title.innerHTML = `Chi tiết Bình chọn trận: <span style="color:var(--primary);">${ui.escapeHTML(match.home_team)} vs ${ui.escapeHTML(match.away_team)}</span>`;
       
       const matchPreds = localPredictions.filter(p => p.match_id === matchId);
 
@@ -375,14 +379,14 @@
           const userObj = localUsers.find(u => u.google_id === p.user_id) || { name: `User ID: ${p.user_id}` };
           
           let choiceLabel = 'Hòa';
-          if (p.prediction === 'W') choiceLabel = `Thắng (${match.home_team})`;
-          if (p.prediction === 'L') choiceLabel = `Thắng (${match.away_team})`;
+          if (p.prediction === 'W') choiceLabel = `Thắng (${ui.escapeHTML(match.home_team)})`;
+          if (p.prediction === 'L') choiceLabel = `Thắng (${ui.escapeHTML(match.away_team)})`;
 
           const submitTime = p.submitted_at ? new Date(p.submitted_at).toLocaleTimeString('vi-VN') + ' ' + new Date(p.submitted_at).toLocaleDateString('vi-VN') : 'Chưa rõ';
 
           html += `
             <tr>
-              <td style="font-weight:600;">${userObj.name}</td>
+              <td style="font-weight:600;">${ui.escapeHTML(userObj.name)}</td>
               <td><span class="pred-badge">${choiceLabel}</span></td>
               <td style="font-size:0.8rem; color:var(--text-muted);">${submitTime}</td>
             </tr>

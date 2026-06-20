@@ -2,10 +2,23 @@
 // Các component UI dùng chung (Header, Footer, Toast thông báo, Hộp thoại chọn User ảo)
 
 const ui = {
+  escapeHTML(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[char]));
+  },
+
   // Tạo Header dùng chung trên các trang
   renderHeader() {
     const user = auth.getCurrentUser();
     const isAdmin = user && user.is_admin;
+    const safeUserName = this.escapeHTML(user?.name);
+    const safeUserEmail = this.escapeHTML(user?.email);
+    const safeAvatarUrl = this.escapeHTML(user?.avatar_url);
     
     // Xác định trang hiện tại để gán class active
     const path = window.location.pathname;
@@ -36,10 +49,10 @@ const ui = {
           <div class="user-auth-zone" id="user-auth-zone">
             ${user ? `
               <div class="user-profile-menu">
-                <img src="${user.avatar_url}" alt="avatar" class="user-avatar">
+                <img src="${safeAvatarUrl}" alt="avatar" class="user-avatar">
                 <div class="user-info-dropdown">
-                  <div class="user-info-name">${user.name}</div>
-                  <div class="user-info-email">${user.email}</div>
+                  <div class="user-info-name">${safeUserName}</div>
+                  <div class="user-info-email">${safeUserEmail}</div>
                   ${user.is_admin ? '<span class="admin-badge">Admin</span>' : '<span class="player-badge">Người chơi</span>'}
                   <hr class="dropdown-divider">
                   <button id="logout-btn" class="dropdown-logout-btn">
@@ -150,7 +163,7 @@ const ui = {
     const user = auth.getCurrentUser();
     const mockUsersOptions = auth.MOCK_USERS.map(u => {
       const isSelected = user && user.google_id === u.google_id;
-      return `<option value="${u.google_id}" ${isSelected ? 'selected' : ''}>${u.name} (${u.is_admin ? 'Admin' : 'Player'})</option>`;
+      return `<option value="${this.escapeHTML(u.google_id)}" ${isSelected ? 'selected' : ''}>${this.escapeHTML(u.name)} (${u.is_admin ? 'Admin' : 'Player'})</option>`;
     }).join('');
 
     // Đọc trạng thái thu nhỏ từ localStorage
@@ -274,7 +287,7 @@ const ui = {
               '<circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />'
             }
           </svg>
-          <span class="toast-message">${message}</span>
+          <span class="toast-message">${this.escapeHTML(message)}</span>
         </div>
       </div>
     `;
@@ -378,11 +391,12 @@ const ui = {
   // Helper render ảnh cờ hoặc text đại diện nếu không tìm thấy
   renderFlag(teamName) {
     const flagUrl = this.getTeamFlagUrl(teamName);
+    const safeTeamName = this.escapeHTML(teamName);
     if (flagUrl) {
-      return `<img src="${flagUrl}" alt="${teamName}" class="team-flag-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-              <div class="team-flag-placeholder" style="display:none;">${teamName.substring(0, 2).toUpperCase()}</div>`;
+      return `<img src="${this.escapeHTML(flagUrl)}" alt="${safeTeamName}" class="team-flag-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+              <div class="team-flag-placeholder" style="display:none;">${safeTeamName.substring(0, 2).toUpperCase()}</div>`;
     }
-    const text = teamName ? teamName.substring(0, 2).toUpperCase() : '??';
+    const text = safeTeamName ? safeTeamName.substring(0, 2).toUpperCase() : '??';
     return `<div class="team-flag-placeholder">${text}</div>`;
   },
 
