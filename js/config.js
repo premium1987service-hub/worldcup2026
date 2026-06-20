@@ -6,7 +6,7 @@ const CONFIG = {
   SPREADSHEET_ID: '1-Uj_m2CNvvFQZm0aOsv2MFGEK4lis0KkfvoP79KYlmg', 
   
   // Thay thế bằng OAuth Client ID từ Google Cloud Console
-  GOOGLE_CLIENT_ID: '', 
+  GOOGLE_CLIENT_ID: '537170929742-4tv26l41tvmor0oqiubk3pajsk4jf08h.apps.googleusercontent.com', 
   
   // Thay thế bằng API token từ football-data.org (nếu dùng dữ liệu thật)
   FOOTBALL_API_TOKEN: '', 
