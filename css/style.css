@@ -194,7 +194,7 @@ body {
 /* User Profile Dropdown Menu */
 .user-info-dropdown {
   position: absolute;
-  top: 130%;
+  top: 100%;
   right: 0;
   background: var(--bg-dark);
   border: 1px solid var(--border);
