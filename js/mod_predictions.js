@@ -52,5 +52,33 @@ const predictions = {
     }
     
     return success;
+  },
+
+  // Thực hiện gửi hàng loạt dự đoán lên server/mock database
+  async submitBatch(predictionsMap) {
+    const user = auth.getCurrentUser();
+    if (!user) {
+      alert('Vui lòng đăng nhập để bình chọn!');
+      return false;
+    }
+
+    if (Object.keys(predictionsMap).length === 0) {
+      alert('Không có bình chọn nào để gửi!');
+      return false;
+    }
+
+    console.log(`Predictions: Gửi hàng loạt bình chọn cho ${Object.keys(predictionsMap).length} trận đấu`);
+    
+    // Ghi dữ liệu xuống Google Sheets / LocalStorage Mock
+    const success = await sheets.savePredictionsBatch(user.google_id, predictionsMap);
+    
+    if (success) {
+      // Bắn event thông báo cập nhật UI thành công
+      window.dispatchEvent(new CustomEvent('prediction_updated', {
+        detail: { predictions: predictionsMap }
+      }));
+    }
+    
+    return success;
   }
 };

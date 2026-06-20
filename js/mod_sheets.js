@@ -383,6 +383,81 @@ const sheets = {
     }
   },
 
+  async savePredictionsBatch(userId, predictionsMap) {
+    if (CONFIG.USE_MOCK_DATA) {
+      let preds = this._getMockStorage('Predictions') || [];
+      for (const [matchId, predictionVal] of Object.entries(predictionsMap)) {
+        const index = preds.findIndex(p => p.user_id === userId && p.match_id === matchId);
+        if (index !== -1) {
+          preds[index].prediction = predictionVal;
+          preds[index].submitted_at = new Date().toISOString();
+        } else {
+          preds.push({
+            prediction_id: 'pred_' + Math.random().toString(36).substr(2, 9),
+            user_id: userId,
+            match_id: matchId,
+            prediction: predictionVal,
+            submitted_at: new Date().toISOString()
+          });
+        }
+      }
+      this._setMockStorage('Predictions', preds);
+      return true;
+    }
+
+    try {
+      const allPreds = await this.getPredictions();
+      const updates = [];
+      const appends = [];
+
+      for (const [matchId, predictionVal] of Object.entries(predictionsMap)) {
+        const index = allPreds.findIndex(p => p.user_id === userId && p.match_id === matchId);
+        if (index !== -1) {
+          const predictionId = allPreds[index].prediction_id;
+          const rowNum = index + 2;
+          const rowData = [predictionId, userId, matchId, predictionVal, new Date().toISOString()];
+          updates.push({
+            range: `Predictions!A${rowNum}:E${rowNum}`,
+            values: [rowData]
+          });
+        } else {
+          const predictionId = 'pred_' + Math.random().toString(36).substr(2, 9);
+          const rowData = [predictionId, userId, matchId, predictionVal, new Date().toISOString()];
+          appends.push(rowData);
+        }
+      }
+
+      if (updates.length > 0) {
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values:batchUpdate`;
+        const body = {
+          valueInputOption: 'USER_ENTERED',
+          data: updates
+        };
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            ...auth.getAuthHeader(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        if (!response.ok) throw new Error('Lỗi cập nhật batch dự đoán');
+      }
+
+      if (appends.length > 0) {
+        await this._fetchSheetsAPI('Predictions!A:E', 'POST', {
+          values: appends
+        });
+      }
+
+      return true;
+    } catch (e) {
+      console.error('Lỗi savePredictionsBatch:', e);
+      alert('Không thể lưu loạt bình chọn lên Google Sheet: ' + e.message);
+      return false;
+    }
+  },
+
   // 4. Quản lý Leaderboard_Cache
   async getLeaderboardCache() {
     if (CONFIG.USE_MOCK_DATA) {

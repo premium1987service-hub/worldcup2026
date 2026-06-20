@@ -31,6 +31,22 @@
         </div>
       </div>
 
+      </div>
+
+      <!-- Thanh thông báo lưu thay đổi (Chỉ hiện khi có thay đổi chưa lưu) -->
+      <div id="submit-bar" class="admin-card" style="display:none; margin-bottom: 20px; border-color: var(--accent); background: rgba(255, 75, 43, 0.05); padding: 16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <span style="font-weight:700; color:var(--accent); font-size:1rem; display:block; margin-bottom:4px;">Bạn có thay đổi dự đoán chưa lưu!</span>
+            <span style="font-size:0.85rem; color:var(--text-medium);" id="submit-bar-text">Thay đổi sẽ chỉ có hiệu lực sau khi bấm Lưu.</span>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="filter-btn" style="border-color:var(--text-muted); color:var(--text-medium); padding: 6px 12px;" onclick="discardPendingChanges()">Hủy bỏ</button>
+            <button class="admin-action-btn" style="background:var(--accent); color:#fff; border:none; padding:8px 20px;" onclick="submitAllPredictions()">Lưu tất cả dự đoán (Submit)</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Danh sách trận đấu bình chọn -->
       <div class="matches-grid" id="predict-matches-list">
         <div class="spinner-container">
@@ -60,6 +76,8 @@
     let currentFilter = 'all';
     let localMatches = [];
     let localMyPredictions = [];
+    let originalPredictions = {};
+    let pendingPredictions = {};
 
     document.addEventListener('DOMContentLoaded', async () => {
       await auth.init();
@@ -89,8 +107,7 @@
       window.addEventListener('football_data_synced', loadData);
       window.addEventListener('prediction_updated', async (e) => {
         // Tải lại dự đoán từ database để đảm bảo khớp dữ liệu
-        localMyPredictions = await predictions.getMyPredictions();
-        renderMatches();
+        await loadData();
       });
 
       // Bật sync kết quả tự động ở nền
@@ -107,11 +124,20 @@
 
         if (user) {
           localMyPredictions = await predictions.getMyPredictions();
+          originalPredictions = {};
+          pendingPredictions = {};
+          localMyPredictions.forEach(p => {
+            originalPredictions[p.match_id] = p.prediction;
+            pendingPredictions[p.match_id] = p.prediction;
+          });
         } else {
           localMyPredictions = [];
+          originalPredictions = {};
+          pendingPredictions = {};
         }
 
         renderMatches();
+        checkUnsavedChanges();
       } catch (e) {
         console.error('Lỗi khi tải dữ liệu bình chọn:', e);
         document.getElementById('predict-matches-list').innerHTML = `
@@ -147,16 +173,11 @@
         return;
       }
 
-      // Map dự đoán của user để tra cứu O(1)
-      const myPredsMap = localMyPredictions.reduce((acc, p) => {
-        acc[p.match_id] = p.prediction;
-        return acc;
-      }, {});
-
+      // Map dự đoán của user từ local pending state để vẽ giao diện chọn
       let html = '';
       filtered.forEach(m => {
         const isLocked = matches.isLocked(m);
-        const myChoice = myPredsMap[m.match_id] || '';
+        const myChoice = pendingPredictions[m.match_id] || '';
         const countdownText = matches.getLockCountdown(m);
         const rules = SCORING_RULES[m.phase] || SCORING_RULES.GROUP;
 
@@ -244,32 +265,110 @@
       container.innerHTML = html;
     }
 
-    // Hàm gọi khi bấm nút Vote (optimistic UI update + gửi lên DB)
-    async function handleVote(matchId, val) {
+    // Kiểm tra và hiển thị thanh submit-bar nếu có thay đổi chưa lưu
+    function checkUnsavedChanges() {
+      const bar = document.getElementById('submit-bar');
+      if (!bar) return;
+
+      let hasChanges = false;
+      let changeCount = 0;
+
+      // Các trận đấu đã chọn khác đi
+      for (const [mId, pred] of Object.entries(pendingPredictions)) {
+        if (originalPredictions[mId] !== pred) {
+          hasChanges = true;
+          changeCount++;
+        }
+      }
+
+      // Các trận đấu đã bị xóa bình chọn
+      for (const mId of Object.keys(originalPredictions)) {
+        if (!pendingPredictions[mId]) {
+          hasChanges = true;
+          changeCount++;
+        }
+      }
+
+      if (hasChanges) {
+        bar.style.display = 'block';
+        document.getElementById('submit-bar-text').textContent = `Bạn đã thay đổi dự đoán cho ${changeCount} trận đấu. Nhấp nút Lưu bên dưới để cập nhật lên hệ thống.`;
+      } else {
+        bar.style.display = 'none';
+      }
+    }
+
+    // Hủy bỏ tất cả thay đổi chưa lưu trên giao diện
+    function discardPendingChanges() {
+      pendingPredictions = { ...originalPredictions };
+      renderMatches();
+      checkUnsavedChanges();
+      ui.showToast('Đã hủy các thay đổi chưa lưu!', 'success');
+    }
+
+    // Gửi toàn bộ bình chọn lên database
+    async function submitAllPredictions() {
+      const user = auth.getCurrentUser();
+      if (!user) {
+        ui.showToast('Vui lòng đăng nhập để lưu bình chọn!', 'error');
+        return;
+      }
+
+      // Tìm danh sách thực tế cần cập nhật
+      const changesToSave = {};
+      
+      // Tìm các dự đoán mới hoặc thay đổi
+      for (const [mId, pred] of Object.entries(pendingPredictions)) {
+        if (originalPredictions[mId] !== pred) {
+          changesToSave[mId] = pred;
+        }
+      }
+      
+      // Tìm các dự đoán đã bị xóa
+      for (const mId of Object.keys(originalPredictions)) {
+        if (!pendingPredictions[mId]) {
+          changesToSave[mId] = ''; // Gửi chuỗi rỗng để xóa/hủy dự đoán
+        }
+      }
+
+      if (Object.keys(changesToSave).length === 0) {
+        ui.showToast('Không có thay đổi nào để lưu!', 'success');
+        return;
+      }
+
+      ui.showToast('Đang lưu các dự đoán của bạn...', 'success');
+
+      const ok = await predictions.submitBatch(changesToSave);
+      if (ok) {
+        ui.showToast('Lưu tất cả dự đoán thành công!', 'success');
+        await loadData();
+      } else {
+        ui.showToast('Lỗi khi lưu bình chọn. Vui lòng thử lại.', 'error');
+      }
+    }
+
+    // Hàm gọi khi bấm nút bình chọn (chỉ cập nhật tạm thời trên UI)
+    function handleVote(matchId, val) {
       const user = auth.getCurrentUser();
       if (!user) {
         ui.showToast('Vui lòng đăng nhập bằng tài khoản Google để bình chọn!', 'error');
         return;
       }
 
-      // Hiệu ứng Optimistic UI: Gán lựa chọn ngay lập tức trên màn hình
-      const btns = document.querySelectorAll(`button[onclick*="${matchId}"]`);
-      btns.forEach(btn => btn.classList.remove('active'));
-      
-      const targetBtn = Array.from(btns).find(btn => btn.getAttribute('onclick').includes(val));
-      if (targetBtn) targetBtn.classList.add('active');
-
-      ui.showToast('Đang gửi bình chọn...', 'success');
-
-      // Gửi thực tế
-      const ok = await predictions.submit(matchId, val);
-      if (ok) {
-        ui.showToast('Lưu dự đoán thành công!', 'success');
-      } else {
-        ui.showToast('Lỗi khi lưu bình chọn. Vui lòng thử lại.', 'error');
-        // Reload lại dữ liệu để hoàn tác UI lỗi
-        loadData();
+      const match = localMatches.find(m => m.match_id === matchId);
+      if (match && matches.isLocked(match)) {
+        ui.showToast('Trận đấu này đã bị khóa bình chọn!', 'error');
+        return;
       }
+
+      if (pendingPredictions[matchId] === val) {
+        // Hủy chọn nếu click lại nút cũ
+        delete pendingPredictions[matchId];
+      } else {
+        pendingPredictions[matchId] = val;
+      }
+
+      renderMatches();
+      checkUnsavedChanges();
     }
   </script>
 </body>
