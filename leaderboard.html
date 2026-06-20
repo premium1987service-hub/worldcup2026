@@ -170,8 +170,8 @@
             </td>
             <td>
               <div class="leaderboard-user">
-                <img src="${avatarUrl}" alt="avatar" class="leaderboard-avatar">
-                <span class="leaderboard-name">${item.name} ${isMe ? ' (Bạn)' : ''}</span>
+                <img src="${ui.escapeHTML(avatarUrl)}" alt="avatar" class="leaderboard-avatar">
+                <span class="leaderboard-name">${ui.escapeHTML(item.name)} ${isMe ? ' (Bạn)' : ''}</span>
               </div>
             </td>
             <td style="text-align: center;">

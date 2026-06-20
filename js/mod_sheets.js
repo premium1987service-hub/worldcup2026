@@ -12,6 +12,21 @@ const sheets = {
     localStorage.setItem(`football_predict_mock_${key}`, JSON.stringify(value));
   },
 
+  _isPredictionRange(range) {
+    return /^Predictions!/i.test(String(range || ''));
+  },
+
+  _assertWriteAllowed(range, method) {
+    if (CONFIG.USE_MOCK_DATA || method === 'GET') return;
+    if (CONFIG.ALLOW_CLIENT_PRIVILEGED_WRITES) return;
+    if (this._isPredictionRange(range)) return;
+
+    throw new Error(
+      'Privileged Google Sheets writes are disabled in client mode. ' +
+      'Use a backend/Apps Script proxy for Users, Matches, and Leaderboard writes.'
+    );
+  },
+
   // Khởi tạo cơ sở dữ liệu (đặc biệt là tạo dữ liệu ảo nếu trống ở lần chạy đầu tiên)
   initDB() {
     if (!CONFIG.USE_MOCK_DATA) return;
@@ -105,6 +120,8 @@ const sheets = {
   async _fetchSheetsAPI(range, method = 'GET', body = null) {
     const user = auth.getCurrentUser();
     if (!user || !user.token) throw new Error('Yêu cầu đăng nhập để ghi dữ liệu.');
+
+    this._assertWriteAllowed(range, method);
 
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${range}`;
     const headers = {

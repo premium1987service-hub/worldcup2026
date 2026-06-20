@@ -180,6 +180,9 @@
         const myChoice = pendingPredictions[m.match_id] || '';
         const countdownText = matches.getLockCountdown(m);
         const rules = SCORING_RULES[m.phase] || SCORING_RULES.GROUP;
+        const safeMatchId = ui.escapeHTML(m.match_id);
+        const safeHomeTeam = ui.escapeHTML(m.home_team);
+        const safeAwayTeam = ui.escapeHTML(m.away_team);
 
         let statusText = 'Sắp đá';
         let statusClass = 'status-scheduled';
@@ -204,7 +207,7 @@
             <div class="match-teams-row">
               <div class="team-box">
                 ${ui.renderFlag(m.home_team)}
-                <span class="team-name" title="${m.home_team}">${m.home_team}</span>
+                <span class="team-name" title="${safeHomeTeam}">${safeHomeTeam}</span>
               </div>
               
               <div class="match-score-vs">
@@ -220,7 +223,7 @@
               
               <div class="team-box">
                 ${ui.renderFlag(m.away_team)}
-                <span class="team-name" title="${m.away_team}">${m.away_team}</span>
+                <span class="team-name" title="${safeAwayTeam}">${safeAwayTeam}</span>
               </div>
             </div>
 
@@ -236,15 +239,15 @@
               <div class="predict-actions">
                 <button class="predict-btn ${myChoice === 'W' ? 'active' : ''}" 
                         ${(!user || isLocked) ? 'disabled' : ''} 
-                        onclick="handleVote('${m.match_id}', 'W')">
-                  <span>${m.home_team}</span>
+                        onclick="handleVote('${safeMatchId}', 'W')">
+                  <span>${safeHomeTeam}</span>
                   <span class="btn-sub-label">Chủ nhà</span>
                 </button>
                 
                 ${rules.allow_draw ? `
                   <button class="predict-btn ${myChoice === 'D' ? 'active' : ''}" 
                           ${(!user || isLocked) ? 'disabled' : ''} 
-                          onclick="handleVote('${m.match_id}', 'D')">
+                          onclick="handleVote('${safeMatchId}', 'D')">
                     <span>Hòa</span>
                     <span class="btn-sub-label">Vòng bảng</span>
                   </button>
@@ -252,8 +255,8 @@
 
                 <button class="predict-btn ${myChoice === 'L' ? 'active' : ''}" 
                         ${(!user || isLocked) ? 'disabled' : ''} 
-                        onclick="handleVote('${m.match_id}', 'L')">
-                  <span>${m.away_team}</span>
+                        onclick="handleVote('${safeMatchId}', 'L')">
+                  <span>${safeAwayTeam}</span>
                   <span class="btn-sub-label">Khách</span>
                 </button>
               </div>

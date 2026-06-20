@@ -67,6 +67,36 @@ const predictions = {
       return false;
     }
 
+    const allMatches = await api.getMatches();
+    const matchById = allMatches.reduce((acc, match) => {
+      acc[String(match.match_id)] = match;
+      return acc;
+    }, {});
+
+    for (const [matchId, predictionValue] of Object.entries(predictionsMap)) {
+      const match = matchById[String(matchId)];
+      if (!match) {
+        alert('Không tìm thấy thông tin một trận đấu trong danh sách lưu!');
+        return false;
+      }
+
+      if (matches.isLocked(match)) {
+        alert(`Trận ${match.home_team} vs ${match.away_team} đã bị khóa bình chọn!`);
+        return false;
+      }
+
+      if (!['W', 'D', 'L', ''].includes(predictionValue)) {
+        alert('Dự đoán không hợp lệ!');
+        return false;
+      }
+
+      const rule = SCORING_RULES[match.phase] || SCORING_RULES.GROUP;
+      if (predictionValue === 'D' && !rule.allow_draw) {
+        alert(`Trận ${match.home_team} vs ${match.away_team} không cho phép chọn Hòa!`);
+        return false;
+      }
+    }
+
     console.log(`Predictions: Gửi hàng loạt bình chọn cho ${Object.keys(predictionsMap).length} trận đấu`);
     
     // Ghi dữ liệu xuống Google Sheets / LocalStorage Mock

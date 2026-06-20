@@ -11,6 +11,10 @@ const CONFIG = {
   // Thay thế bằng API token từ football-data.org (nếu dùng dữ liệu thật)
   FOOTBALL_API_TOKEN: '', 
 
+  // Cho phép ghi trực tiếp từ trình duyệt vào các bảng đặc quyền (Users, Matches, Leaderboard_Cache).
+  // Bật TRUE vì Google Sheet được chia sẻ quyền chỉnh sửa (Editor) cho tất cả người dùng.
+  ALLOW_CLIENT_PRIVILEGED_WRITES: true,
+
   // Tự động sử dụng Mock Data nếu chưa cấu hình API thực tế
   // Cực kỳ hữu ích cho việc trải nghiệm và kiểm thử ngay lập tức!
   get USE_MOCK_DATA() {
