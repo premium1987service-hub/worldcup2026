@@ -7,9 +7,6 @@ const CONFIG = {
   
   // Thay thế bằng OAuth Client ID từ Google Cloud Console
   GOOGLE_CLIENT_ID: '537170929742-4tv26l41tvmor0oqiubk3pajsk4jf08h.apps.googleusercontent.com', 
-
-  // URL của Google Apps Script Web App làm API trung gian
-  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyDeKgm_clbHRllONdL7ZD3hKor2O9m7nojBz4SEKOzTQswPihwkvfT4v-yn_FMNnklxg/exec', 
   
   // Thay thế bằng API token từ football-data.org (nếu dùng dữ liệu thật)
   FOOTBALL_API_TOKEN: '', 

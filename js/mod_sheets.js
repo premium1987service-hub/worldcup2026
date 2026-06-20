@@ -103,68 +103,34 @@ const sheets = {
   // --- API đọc/ghi chung (Tự động rẽ nhánh Mock / Real Sheets API) ---
 
   async _fetchSheetsAPI(range, method = 'GET', body = null) {
-    if (!CONFIG.APPS_SCRIPT_URL) {
-      throw new Error('Chưa cấu hình APPS_SCRIPT_URL trong config.js');
-    }
+    const user = auth.getCurrentUser();
+    if (!user || !user.token) throw new Error('Yêu cầu đăng nhập để ghi dữ liệu.');
 
-    const sheetName = range.split('!')[0];
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values/${range}`;
+    const headers = {
+      ...auth.getAuthHeader(),
+      'Content-Type': 'application/json'
+    };
+
+    let fullUrl = url;
+    const options = { method, headers };
 
     if (method === 'GET') {
-      const url = `${CONFIG.APPS_SCRIPT_URL}?action=read&sheet=${sheetName}`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`Lỗi kết nối Apps Script: ${response.statusText}`);
-      const result = await response.json();
-      if (result.error) throw new Error(result.error);
-      
-      // Bỏ hàng tiêu đề (hàng 1) để khớp cấu hình Google Sheets API
-      const dataRows = result.values ? result.values.slice(1) : [];
-      return { values: dataRows };
-    } 
-    
-    else if (method === 'PUT') {
-      // Cập nhật dòng cụ thể (writeRow)
-      const rowMatch = range.match(/\d+/);
-      const rowNum = rowMatch ? parseInt(rowMatch[0]) : null;
-      if (!rowNum) throw new Error('Không tìm thấy chỉ số dòng để cập nhật');
-
-      const payload = {
-        action: 'writeRow',
-        sheet: sheetName,
-        rowNum: rowNum,
-        values: body.values[0]
-      };
-
-      const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) throw new Error(`Lỗi kết nối Apps Script: ${response.statusText}`);
-      const result = await response.json();
-      if (result.error) throw new Error(result.error);
-      return result;
-    } 
-    
-    else if (method === 'POST') {
-      // Append dòng mới (appendRow)
-      const rows = body.values;
-      for (const row of rows) {
-        const payload = {
-          action: 'appendRow',
-          sheet: sheetName,
-          values: row
-        };
-        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (!response.ok) throw new Error(`Lỗi kết nối Apps Script: ${response.statusText}`);
-        const result = await response.json();
-        if (result.error) throw new Error(result.error);
-      }
-      return { success: true };
+      // no body
+    } else if (method === 'PUT') {
+      fullUrl += '?valueInputOption=USER_ENTERED';
+      options.body = JSON.stringify(body);
+    } else if (method === 'POST') {
+      fullUrl += ':append?valueInputOption=USER_ENTERED';
+      options.body = JSON.stringify(body);
     }
+
+    const response = await fetch(fullUrl, options);
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(`Google Sheets API Error: ${err.error?.message || response.statusText}`);
+    }
+    return await response.json();
   },
 
   // 1. Quản lý Users
@@ -462,18 +428,20 @@ const sheets = {
       }
 
       if (updates.length > 0) {
-        const payload = {
-          action: 'batchUpdate',
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}/values:batchUpdate`;
+        const body = {
+          valueInputOption: 'USER_ENTERED',
           data: updates
         };
-        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+        const response = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          headers: {
+            ...auth.getAuthHeader(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
         });
-        if (!response.ok) throw new Error('Lỗi cập nhật batch dự đoán qua Apps Script');
-        const result = await response.json();
-        if (result.error) throw new Error(result.error);
+        if (!response.ok) throw new Error('Lỗi cập nhật batch dự đoán');
       }
 
       if (appends.length > 0) {
@@ -521,6 +489,8 @@ const sheets = {
     }
 
     try {
+      // Xóa và ghi đè toàn bộ bảng Leaderboard_Cache
+      // Format dữ liệu theo hàng
       const rows = cacheArray.map(item => [
         item.user_id,
         item.name,
@@ -531,19 +501,21 @@ const sheets = {
         item.last_updated || new Date().toISOString()
       ]);
 
-      const payload = {
-        action: 'clearAndWriteLeaderboard',
-        rows: rows
-      };
-
-      const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+      // Bước 1: Clear dữ liệu cũ
+      // (Google Sheets API v4 không có hàm clear trực tiếp dễ dàng bằng 1 request mà không cấp quyền ghi đè,
+      // vì thế chúng ta sẽ ghi đè đè dải dữ liệu đủ lớn A2:G100)
+      const emptyRow = ['', '', '', '', '', '', ''];
+      const clearData = Array(100).fill(emptyRow);
+      await this._fetchSheetsAPI('Leaderboard_Cache!A2:G101', 'PUT', {
+        values: clearData
       });
-      if (!response.ok) throw new Error('Lỗi cập nhật bảng xếp hạng qua Apps Script');
-      const result = await response.json();
-      if (result.error) throw new Error(result.error);
+
+      // Bước 2: Ghi dữ liệu mới vào
+      if (rows.length > 0) {
+        await this._fetchSheetsAPI('Leaderboard_Cache!A2:G' + (rows.length + 1), 'PUT', {
+          values: rows
+        });
+      }
     } catch (e) {
       console.error('Lỗi khi cập nhật Leaderboard_Cache:', e);
     }
