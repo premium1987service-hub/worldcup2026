@@ -65,7 +65,7 @@ const auth = {
     try {
       const client = google.accounts.oauth2.initTokenClient({
         client_id: CONFIG.GOOGLE_CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/spreadsheets',
+        scope: 'https://www.googleapis.com/auth/spreadsheets email profile openid',
         callback: async (tokenResponse) => {
           if (tokenResponse.error !== undefined) {
             console.error('Lỗi OAuth:', tokenResponse);
@@ -158,7 +158,15 @@ const auth = {
       String(u.google_id) === String(this._currentUser.google_id) || 
       (u.email && this._currentUser.email && u.email.toLowerCase().trim() === this._currentUser.email.toLowerCase().trim())
     );
-    return dbUser ? (dbUser.is_admin === true || String(dbUser.is_admin).trim().toUpperCase() === 'TRUE') : false;
+    const isAdminDB = dbUser ? (dbUser.is_admin === true || String(dbUser.is_admin).trim().toUpperCase() === 'TRUE') : false;
+    
+    // Đồng bộ lại local storage session nếu trạng thái admin thực tế bị thay đổi
+    if (this._currentUser && this._currentUser.is_admin !== isAdminDB) {
+      this._currentUser.is_admin = isAdminDB;
+      localStorage.setItem(this._sessionKey, JSON.stringify(this._currentUser));
+    }
+    
+    return isAdminDB;
   },
 
   // Guard: chuyển hướng nếu chưa đăng nhập
