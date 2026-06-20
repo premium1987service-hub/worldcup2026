@@ -3,7 +3,7 @@
 
 const CONFIG = {
   // Thay thế bằng ID của Google Spreadsheet thực tế của bạn
-  SPREADSHEET_ID: '', 
+  SPREADSHEET_ID: '1-Uj_m2CNvvFQZm0aOsv2MFGEK4lis0KkfvoP79KYlmg', 
   
   // Thay thế bằng OAuth Client ID từ Google Cloud Console
   GOOGLE_CLIENT_ID: '', 
