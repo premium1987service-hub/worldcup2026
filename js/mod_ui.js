@@ -112,7 +112,17 @@ const ui = {
 
       if (loginBtn) {
         loginBtn.addEventListener('click', () => {
-          auth.login();
+          auth.login(async (appUser) => {
+            const isAdmin = await auth.isAdmin();
+            if (isAdmin) {
+              ui.showToast('Chào mừng Admin đăng nhập! Đang chuyển hướng...', 'success');
+              setTimeout(() => {
+                window.location.href = 'admin.html';
+              }, 1000);
+            } else {
+              window.location.reload();
+            }
+          });
         });
       }
 
